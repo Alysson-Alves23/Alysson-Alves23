@@ -1,23 +1,16 @@
 import { useEffect, useRef, type CSSProperties } from 'react';
-import {
-    createCanva3D,
-    type Canva3DViewport,
-} from '../render/Canva3d';
+import { Canva3D } from '../render/Canva3d';
 
 export interface Canva3dProps {
     className?: string;
     style?: CSSProperties;
-    onReady?: (viewport: Canva3DViewport) => void;
 }
 
 export default function Canva3d({
     className,
     style,
-    onReady,
 }: Canva3dProps) {
     const containerRef = useRef<HTMLDivElement>(null);
-    const onReadyRef = useRef(onReady);
-    onReadyRef.current = onReady;
 
     useEffect(() => {
         const container = containerRef.current;
@@ -26,11 +19,10 @@ export default function Canva3d({
             return undefined;
         }
 
-        const viewport = createCanva3D(container);
-        onReadyRef.current?.(viewport);
+        const canva3D = new Canva3D(container);
 
         return () => {
-            viewport.dispose();
+            canva3D.dispose();
         };
     }, []);
 

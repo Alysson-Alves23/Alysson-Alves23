@@ -9,7 +9,7 @@ export class SimulationScene extends THREE.Scene {
 
         this.name = 'SimulationScene';
         this.environmentGroup.name = 'Environment';
-        this.chargesGroup.name = 'Chargas';
+        this.chargesGroup.name = 'Charges';
 
 
         this.add(

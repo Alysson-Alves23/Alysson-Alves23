@@ -2,14 +2,6 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three-stdlib';
 import { SimulationScene } from './SimulationScene';
 
-export interface Canva3DViewport {
-    scene: SimulationScene;
-    camera: THREE.PerspectiveCamera;
-    renderer: THREE.WebGLRenderer;
-    controls: OrbitControls;
-    dispose: () => void;
-}
-
 function disposeSceneResources(scene: THREE.Scene): void {
     scene.traverse((object) => {
         if (
@@ -28,53 +20,62 @@ function disposeSceneResources(scene: THREE.Scene): void {
     });
 }
 
-export function createCanva3D(container: HTMLElement): Canva3DViewport {
-    const scene = new SimulationScene();
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
-    camera.position.set(7, 5, 9);
-    camera.lookAt(0, 0, 0);
+export class Canva3D {
+    public readonly scene: SimulationScene;
+    public readonly camera: THREE.PerspectiveCamera;
+    public readonly renderer: THREE.WebGLRenderer;
+    public readonly controls: OrbitControls;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.setClearColor(0x0b1020, 1);
-    container.appendChild(renderer.domElement);
+    private readonly resizeObserver: ResizeObserver;
 
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.target.set(0, 0, 0);
+    public constructor(container: HTMLElement) {
+        this.scene = new SimulationScene();
+        this.camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
+        this.camera.position.set(7, 5, 9);
+        this.camera.lookAt(0, 0, 0);
 
-    const resize = (): void => {
-        const width = Math.max(container.clientWidth, 1);
-        const height = Math.max(container.clientHeight, 1);
+        this.renderer = new THREE.WebGLRenderer({
+            antialias: true,
+            alpha: false,
+        });
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+        this.renderer.setClearColor(0x0b1020, 1);
+        container.appendChild(this.renderer.domElement);
 
-        camera.aspect = width / height;
-        camera.updateProjectionMatrix();
-        renderer.setSize(width, height, false);
-    };
+        this.controls = new OrbitControls(
+            this.camera,
+            this.renderer.domElement,
+        );
+        this.controls.enableDamping = true;
+        this.controls.target.set(0, 0, 0);
 
-    const resizeObserver = new ResizeObserver(resize);
-    resizeObserver.observe(container);
-    resize();
+        const resize = (): void => {
+            const width = Math.max(container.clientWidth, 1);
+            const height = Math.max(container.clientHeight, 1);
 
-    renderer.setAnimationLoop(() => {
-        controls.update();
-        renderer.render(scene, camera);
-    });
+            this.camera.aspect = width / height;
+            this.camera.updateProjectionMatrix();
+            this.renderer.setSize(width, height, false);
+        };
 
-    return {
-        scene,
-        camera,
-        renderer,
-        controls,
-        dispose: () => {
-            resizeObserver.disconnect();
-            renderer.setAnimationLoop(null);
-            controls.dispose();
-            disposeSceneResources(scene);
-            renderer.dispose();
-            renderer.domElement.remove();
-            scene.clear();
-        },
-    };
+        this.resizeObserver = new ResizeObserver(resize);
+        this.resizeObserver.observe(container);
+        resize();
+
+        this.renderer.setAnimationLoop(() => {
+            this.controls.update();
+            this.renderer.render(this.scene, this.camera);
+        });
+    }
+
+    public dispose(): void {
+        this.resizeObserver.disconnect();
+        this.renderer.setAnimationLoop(null);
+        this.controls.dispose();
+        disposeSceneResources(this.scene);
+        this.renderer.dispose();
+        this.renderer.domElement.remove();
+        this.scene.clear();
+    }
 }
