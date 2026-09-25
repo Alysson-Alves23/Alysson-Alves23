@@ -19,4 +19,8 @@
 ![Logotipo do Simulador](/img/VOLTPLAY.png)
 
 
+# Citações Importantes de Livros:
 
+> Renda-se, como eu me rendi. Mergulhe no que você não conhece como eu mergulhei. Não se preocupe em entender, viver ultrapassa qualquer entendimento.
+
+**_A Hora da Estrela, Clarice Lispector_**
