@@ -1,11 +1,9 @@
-import { Atom } from 'lucide-react';
+import Canva3d from './ui/Canva3d';
 
 export default function App() {
     return (
-        <div>
-            <Atom/>
-            Hello,World
-
-        </div>
-           );
+        <main style={{ width: '100vw', height: '100vh' }}>
+            <Canva3d />
+        </main>
+    );
 }
