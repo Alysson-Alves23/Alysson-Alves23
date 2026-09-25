@@ -5,5 +5,5 @@
 
 Logotipo do simulador VoltPlay:
 
-![Logotipo do Simulador](../img/VOLTPLAY.png)
+![Logotipo do Simulador](/img/VOLTPLAY.png)
 
