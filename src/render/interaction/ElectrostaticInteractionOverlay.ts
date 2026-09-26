@@ -1,12 +1,15 @@
 import * as THREE from 'three';
-import { Charge } from '../objects/Charge';
+import type {
+    ElectrostaticDistanceGuide,
+    ElectrostaticForceVector,
+    ElectrostaticVisualization,
+    ElectricFieldSample,
+} from '../../core/physics/types';
 import type { VisualizationVisibility } from '../types/VisualizationVisibility';
 
 const FIELD_COLOR = 0x66d9ef;
 const FORCE_COLOR = 0xffb347;
 const GUIDE_COLOR = 0xc4ceda;
-const FIELD_GRID_SIZE = 4;
-const FIELD_GRID_DIVISIONS = 8;
 const VISUAL_OFFSET = 0.06;
 
 function clamp(value: number, minimum: number, maximum: number): number {
@@ -39,18 +42,22 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
     public readonly forceVectorsGroup = new THREE.Group();
     public readonly interactionGuidesGroup = new THREE.Group();
 
-    private readonly chargesGroup: THREE.Group;
     private globalVisibility: VisualizationVisibility = {
         electricField: false,
         forceVectors: false,
         distanceGuide: false,
     };
+    private visualization: ElectrostaticVisualization = {
+        electricField: [],
+        forceVectors: [],
+        distanceGuides: [],
+    };
+    private chargeVisibility = new Map<string, VisualizationVisibility>();
     private lastSignature = '';
 
-    public constructor(chargesGroup: THREE.Group) {
+    public constructor() {
         super();
 
-        this.chargesGroup = chargesGroup;
         this.name = 'ElectrostaticInteractionOverlay';
         this.electricFieldGroup.name = 'ElectricField';
         this.forceVectorsGroup.name = 'ForceVectors';
@@ -66,9 +73,20 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
         this.globalVisibility = { ...visibility };
     }
 
+    public setVisualization(
+        visualization: ElectrostaticVisualization,
+        chargeVisibility: ReadonlyMap<string, VisualizationVisibility>,
+    ): void {
+        this.visualization = visualization;
+        this.chargeVisibility = new Map(chargeVisibility);
+    }
+
     public update(): void {
-        const charges = this.getCharges();
-        const signature = this.createSignature(charges);
+        const signature = JSON.stringify({
+            globalVisibility: this.globalVisibility,
+            visualization: this.visualization,
+            chargeVisibility: Array.from(this.chargeVisibility.entries()),
+        });
 
         if (signature === this.lastSignature) {
             return;
@@ -77,39 +95,17 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
         this.lastSignature = signature;
         this.clearVisualGroups();
 
-        if (charges.length === 0) {
-            return;
-        }
-
         if (this.globalVisibility.electricField) {
-            this.renderElectricField(charges);
+            this.renderElectricField(this.visualization.electricField);
         }
 
         if (this.globalVisibility.forceVectors) {
-            this.renderForceVectors(charges);
+            this.renderForceVectors(this.visualization.forceVectors);
         }
 
         if (this.globalVisibility.distanceGuide) {
-            this.renderDistanceGuides(charges);
+            this.renderDistanceGuides(this.visualization.distanceGuides);
         }
-    }
-
-    private getCharges(): Charge[] {
-        return this.chargesGroup.children.filter(
-            (object): object is Charge => object instanceof Charge,
-        );
-    }
-
-    private createSignature(charges: Charge[]): string {
-        return JSON.stringify({
-            globalVisibility: this.globalVisibility,
-            charges: charges.map((charge) => ({
-                id: charge.chargeId,
-                value: charge.getValue(),
-                position: [charge.position.x, charge.position.y, charge.position.z],
-                visibility: charge.getVisibility(),
-            })),
-        });
     }
 
     private clearVisualGroups(): void {
@@ -123,110 +119,60 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
         });
     }
 
-    private renderElectricField(charges: Charge[]): void {
-        const spacing = (FIELD_GRID_SIZE * 2) / FIELD_GRID_DIVISIONS;
-
-        for (let row = 0; row <= FIELD_GRID_DIVISIONS; row += 1) {
-            for (let column = 0; column <= FIELD_GRID_DIVISIONS; column += 1) {
-                const point = new THREE.Vector3(
-                    -FIELD_GRID_SIZE + column * spacing,
-                    VISUAL_OFFSET,
-                    -FIELD_GRID_SIZE + row * spacing,
-                );
-                const field = this.calculateElectricField(point, charges);
-
-                if (field.lengthSq() < 0.0001) {
-                    continue;
-                }
-
-                const magnitude = field.length();
-                const direction = field.normalize();
-                const length = clamp(0.08 + Math.log1p(magnitude) * 0.12, 0.08, 0.55);
-                const arrow = new THREE.ArrowHelper(
-                    direction,
-                    point,
-                    length,
-                    FIELD_COLOR,
-                    length * 0.28,
-                    length * 0.16,
-                );
-                arrow.name = 'ElectricFieldVector';
-                this.configureArrow(arrow);
-                this.electricFieldGroup.add(arrow);
-            }
-        }
+    private isLayerVisible(chargeId: string, layer: keyof VisualizationVisibility): boolean {
+        return this.chargeVisibility.get(chargeId)?.[layer] ?? true;
     }
 
-    private calculateElectricField(point: THREE.Vector3, charges: Charge[]): THREE.Vector3 {
-        const field = new THREE.Vector3();
-
-        charges.forEach((charge) => {
-            if (!charge.getVisibility().electricField || charge.getValue() === 0) {
+    private renderElectricField(samples: readonly ElectricFieldSample[]): void {
+        samples.forEach((sample) => {
+            if (!this.isLayerVisible(sample.chargeId, 'electricField')) {
                 return;
             }
 
-            const offset = point.clone().sub(charge.position);
-            const distanceSquared = Math.max(offset.lengthSq(), 0.04);
-            const distance = Math.sqrt(distanceSquared);
-            field.addScaledVector(
-                offset,
-                charge.getValue() / (distanceSquared * distance),
+            const length = clamp(0.08 + Math.log1p(sample.magnitude) * 0.12, 0.08, 0.55);
+            const origin = new THREE.Vector3(
+                sample.origin[0],
+                sample.origin[1],
+                sample.origin[2],
             );
+            const arrow = new THREE.ArrowHelper(
+                new THREE.Vector3(...sample.direction),
+                origin,
+                length,
+                FIELD_COLOR,
+                length * 0.28,
+                length * 0.16,
+            );
+            arrow.name = 'ElectricFieldVector';
+            this.configureArrow(arrow);
+            this.electricFieldGroup.add(arrow);
         });
-
-        return field;
     }
 
-    private renderForceVectors(charges: Charge[]): void {
-        for (let firstIndex = 0; firstIndex < charges.length; firstIndex += 1) {
-            for (let secondIndex = firstIndex + 1; secondIndex < charges.length; secondIndex += 1) {
-                const firstCharge = charges[firstIndex];
-                const secondCharge = charges[secondIndex];
-                const product = firstCharge.getValue() * secondCharge.getValue();
-                const offset = secondCharge.position.clone().sub(firstCharge.position);
-                const distance = offset.length();
-
-                if (distance < 0.001 || product === 0) {
-                    continue;
-                }
-
-                const directionToSecond = offset.normalize();
-                const firstDirection = directionToSecond.multiplyScalar(product > 0 ? -1 : 1);
-                const secondDirection = firstDirection.clone().negate();
-                const forceMagnitude = Math.abs(product) / (distance * distance);
-                const arrowLength = clamp(
-                    0.14 + Math.log1p(forceMagnitude) * 0.22,
-                    0.14,
-                    1.25,
-                );
-
-                if (firstCharge.getVisibility().forceVectors) {
-                    this.addForceArrow(firstCharge.position, firstDirection, arrowLength);
-                }
-
-                if (secondCharge.getVisibility().forceVectors) {
-                    this.addForceArrow(secondCharge.position, secondDirection, arrowLength);
-                }
+    private renderForceVectors(vectors: readonly ElectrostaticForceVector[]): void {
+        vectors.forEach((vector) => {
+            if (!this.isLayerVisible(vector.chargeId, 'forceVectors')) {
+                return;
             }
-        }
-    }
 
-    private addForceArrow(
-        origin: THREE.Vector3,
-        direction: THREE.Vector3,
-        length: number,
-    ): void {
-        const arrow = new THREE.ArrowHelper(
-            direction,
-            origin.clone().setY(origin.y + VISUAL_OFFSET),
-            length,
-            FORCE_COLOR,
-            length * 0.32,
-            length * 0.2,
-        );
-        arrow.name = 'ElectrostaticForceVector';
-        this.configureArrow(arrow);
-        this.forceVectorsGroup.add(arrow);
+            const length = clamp(0.12 + Math.log1p(vector.magnitude) * 0.12, 0.12, 0.5);
+            const origin = new THREE.Vector3(
+                vector.origin[0],
+                vector.origin[1],
+                vector.origin[2],
+            );
+            const arrow = new THREE.ArrowHelper(
+                new THREE.Vector3(...vector.direction),
+                origin,
+                length,
+                FORCE_COLOR,
+                length * 0.32,
+                length * 0.2,
+            );
+            arrow.name = `ElectrostaticForceVector:${vector.chargeId}`;
+            this.configureArrow(arrow);
+            this.forceVectorsGroup.add(arrow);
+        });
     }
 
     private configureArrow(arrow: THREE.ArrowHelper): void {
@@ -242,54 +188,44 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
         });
     }
 
-    private renderDistanceGuides(charges: Charge[]): void {
-        for (let firstIndex = 0; firstIndex < charges.length; firstIndex += 1) {
-            for (let secondIndex = firstIndex + 1; secondIndex < charges.length; secondIndex += 1) {
-                const firstCharge = charges[firstIndex];
-                const secondCharge = charges[secondIndex];
-
-                if (
-                    !firstCharge.getVisibility().distanceGuide
-                    && !secondCharge.getVisibility().distanceGuide
-                ) {
-                    continue;
-                }
-
-                const distance = firstCharge.position.distanceTo(secondCharge.position);
-
-                if (distance < 0.001) {
-                    continue;
-                }
-
-                const line = new THREE.Line(
-                    new THREE.BufferGeometry().setFromPoints([
-                        firstCharge.position.clone().setY(firstCharge.position.y + VISUAL_OFFSET),
-                        secondCharge.position.clone().setY(secondCharge.position.y + VISUAL_OFFSET),
-                    ]),
-                    new THREE.LineDashedMaterial({
-                        color: GUIDE_COLOR,
-                        dashSize: 0.1,
-                        gapSize: 0.07,
-                        transparent: true,
-                        opacity: 0.7,
-                        depthTest: false,
-                        depthWrite: false,
-                    }),
-                );
-                line.computeLineDistances();
-                line.name = 'RadialInteractionLine';
-                line.renderOrder = 10;
-                this.interactionGuidesGroup.add(line);
-
-                const midpoint = firstCharge.position.clone()
-                    .add(secondCharge.position)
-                    .multiplyScalar(0.5);
-                const label = this.createDistanceLabel(`r = ${distance.toFixed(2)} u`);
-                label.position.copy(midpoint);
-                label.position.y += VISUAL_OFFSET + 0.12;
-                this.interactionGuidesGroup.add(label);
+    private renderDistanceGuides(guides: readonly ElectrostaticDistanceGuide[]): void {
+        guides.forEach((guide) => {
+            if (
+                !this.isLayerVisible(guide.firstChargeId, 'distanceGuide')
+                && !this.isLayerVisible(guide.secondChargeId, 'distanceGuide')
+            ) {
+                return;
             }
-        }
+
+            const line = new THREE.Line(
+                new THREE.BufferGeometry().setFromPoints([
+                    new THREE.Vector3(guide.start[0], guide.start[1], guide.start[2]),
+                    new THREE.Vector3(guide.end[0], guide.end[1], guide.end[2]),
+                ]),
+                new THREE.LineDashedMaterial({
+                    color: GUIDE_COLOR,
+                    dashSize: 0.1,
+                    gapSize: 0.07,
+                    transparent: true,
+                    opacity: 0.7,
+                    depthTest: false,
+                    depthWrite: false,
+                }),
+            );
+            line.computeLineDistances();
+            line.name = 'RadialInteractionLine';
+            line.renderOrder = 10;
+            this.interactionGuidesGroup.add(line);
+
+            const midpoint = new THREE.Vector3(
+                (guide.start[0] + guide.end[0]) / 2,
+                (guide.start[1] + guide.end[1]) / 2 + VISUAL_OFFSET + 0.12,
+                (guide.start[2] + guide.end[2]) / 2,
+            );
+            const label = this.createDistanceLabel(`r = ${guide.distance.toFixed(2)} u`);
+            label.position.copy(midpoint);
+            this.interactionGuidesGroup.add(label);
+        });
     }
 
     private createDistanceLabel(text: string): THREE.Sprite {

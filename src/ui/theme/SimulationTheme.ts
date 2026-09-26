@@ -1,7 +1,7 @@
 import type { SimulationThemeConfig } from '../../render/types/SimulationTheme';
 
 export const defaultSimulationTheme: SimulationThemeConfig = {
-    background: '#b8b5b5',
+    background: '#fff',
     grid: {
         centerLine: '#405070',
         gridLines: '#1e2a42',

@@ -1,5 +1,11 @@
 import * as THREE from 'three';
 import {
+    ElectrostaticVisualizationCalculator,
+} from '../../core/physics/Electrostatics';
+import type {
+    ElectrostaticVisualization,
+} from '../../core/physics/types';
+import {
     Charge,
     type ChargeOptions,
 } from '../objects/Charge';
@@ -16,6 +22,13 @@ export class SimulationScene extends THREE.Scene {
     public readonly interactionGuidesGroup: THREE.Group;
 
     private readonly theme: SimulationThemeConfig;
+    private readonly electrostaticCalculator = new ElectrostaticVisualizationCalculator();
+    private electrostaticVisualization: ElectrostaticVisualization = {
+        electricField: [],
+        forceVectors: [],
+        distanceGuides: [],
+    };
+    private lastPhysicsSignature = '';
 
     public constructor(theme: SimulationThemeConfig) {
         super();
@@ -24,9 +37,7 @@ export class SimulationScene extends THREE.Scene {
         this.name = 'SimulationScene';
         this.environmentGroup.name = 'Environment';
         this.chargesGroup.name = 'Charges';
-        this.electrostaticInteractionOverlay = new ElectrostaticInteractionOverlay(
-            this.chargesGroup,
-        );
+        this.electrostaticInteractionOverlay = new ElectrostaticInteractionOverlay();
         this.electricFieldGroup = this.electrostaticInteractionOverlay.electricFieldGroup;
         this.forceVectorsGroup = this.electrostaticInteractionOverlay.forceVectorsGroup;
         this.interactionGuidesGroup = this.electrostaticInteractionOverlay.interactionGuidesGroup;
@@ -62,6 +73,34 @@ export class SimulationScene extends THREE.Scene {
     }
 
     public updateVisualizations(): void {
+        this.updateMatrixWorld(true);
+        const charges = this.chargesGroup.children
+            .filter((object): object is Charge => object instanceof Charge)
+            .map((charge) => {
+                const worldPosition = charge.getWorldPosition(new THREE.Vector3());
+
+                return {
+                    id: charge.chargeId,
+                    value: charge.getValue(),
+                    position: [worldPosition.x, worldPosition.y, worldPosition.z] as const,
+                };
+            });
+        const physicsSignature = JSON.stringify(charges);
+
+        if (physicsSignature !== this.lastPhysicsSignature) {
+            this.lastPhysicsSignature = physicsSignature;
+            this.electrostaticVisualization = this.electrostaticCalculator.calculate(charges);
+        }
+
+        const chargeVisibility = new Map(
+            this.chargesGroup.children
+                .filter((object): object is Charge => object instanceof Charge)
+                .map((charge) => [charge.chargeId, charge.getVisibility()] as const),
+        );
+        this.electrostaticInteractionOverlay.setVisualization(
+            this.electrostaticVisualization,
+            chargeVisibility,
+        );
         this.electrostaticInteractionOverlay.update();
     }
 

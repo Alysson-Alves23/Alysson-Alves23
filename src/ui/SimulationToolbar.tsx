@@ -1,10 +1,6 @@
 import {
     Activity,
     ArrowUpRight,
-    ChevronDown,
-    CircleDot,
-    MousePointer2,
-    Move,
     Ruler,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -16,16 +12,12 @@ import type {
     VisualizationLayer,
 } from './simulationTypes';
 
-export type SimulationTool = 'select' | 'move';
-
 export interface SimulationToolbarProps {
-    activeTool: SimulationTool;
-    chargesCount: number;
+    selectedChargeId: string | null;
     draft: ChargeDraft;
     globalVisibility: ChargeVisibility;
     onDraftChange: (field: ChargeDraftField, value: string) => void;
     onToggleGlobalLayer: (layer: VisualizationLayer) => void;
-    onToolChange: (tool: SimulationTool) => void;
 }
 
 const toolbarStyle: CSSProperties = {
@@ -95,16 +87,6 @@ const compactInputStyle: CSSProperties = {
     fontVariantNumeric: 'tabular-nums',
 };
 
-function toolButtonStyle(isActive: boolean): CSSProperties {
-    return {
-        ...toolButtonBaseStyle,
-        color: isActive ? '#f5f8fc' : '#9ba9bb',
-        background: isActive ? '#2c5f93' : 'transparent',
-        borderColor: isActive ? '#3e83c4' : 'transparent',
-        boxShadow: isActive ? 'inset 0 0 0 1px rgba(255,255,255,0.05)' : 'none',
-    };
-}
-
 function VisibilityToggle({
     icon: Icon,
     label,
@@ -142,10 +124,12 @@ function VisibilityToggle({
 function AxisField({
     axis,
     value,
+    disabled,
     onChange,
 }: {
     axis: 'x' | 'y' | 'z';
     value: string;
+    disabled: boolean;
     onChange: (field: ChargeDraftField, value: string) => void;
 }) {
     return (
@@ -153,9 +137,16 @@ function AxisField({
             <span style={{ color: '#8391a3', fontSize: 11, fontWeight: 700 }}>{axis.toUpperCase()}</span>
             <input
                 aria-label={`Coordenada ${axis.toUpperCase()}`}
-                style={compactInputStyle}
-                type="number"
-                step="any"
+                style={{
+                    ...compactInputStyle,
+                    color: disabled ? '#647286' : '#e7edf6',
+                    background: disabled ? '#12171e' : '#171d25',
+                    cursor: disabled ? 'not-allowed' : 'text',
+                }}
+                type="text"
+                inputMode="decimal"
+                placeholder="—"
+                disabled={disabled}
                 value={value}
                 onChange={(event) => onChange(axis, event.target.value)}
             />
@@ -164,40 +155,31 @@ function AxisField({
 }
 
 export function SimulationToolbar({
-    activeTool,
-    chargesCount,
+    selectedChargeId,
     draft,
     globalVisibility,
     onDraftChange,
     onToggleGlobalLayer,
-    onToolChange,
 }: SimulationToolbarProps) {
     return (
         <header style={toolbarStyle} aria-label="Barra de ferramentas da simulação">
-            <div style={toolbarGroupStyle} aria-label="Ferramentas">
-                <button
-                    style={toolButtonStyle(activeTool === 'select')}
-                    type="button"
-                    title="Selecionar carga (V)"
-                    aria-label="Selecionar carga"
-                    aria-pressed={activeTool === 'select'}
-                    onClick={() => onToolChange('select')}
-                >
-                    <MousePointer2 size={16} strokeWidth={1.9} />
-                    <span>Selecionar</span>
-                </button>
-                <button
-                    style={toolButtonStyle(activeTool === 'move')}
-                    type="button"
-                    title="Mover carga (G)"
-                    aria-label="Mover carga"
-                    aria-pressed={activeTool === 'move'}
-                    onClick={() => onToolChange('move')}
-                >
-                    <Move size={16} strokeWidth={1.9} />
-                    <span>Mover</span>
-                </button>
-            </div>
+            <span
+                title="Clique seleciona. Shift + clique adiciona ou remove da seleção. Ctrl + arraste move a carga; se ela estiver selecionada, move a seleção."
+                aria-label="Clique seleciona; Shift mais clique altera a seleção; Control mais arraste move a carga ou a seleção da carga arrastada."
+                style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 30,
+                    height: 30,
+                    flexShrink: 0,
+                    color: '#9ba9bb',
+                    border: '1px solid #303946',
+                    borderRadius: 6,
+                }}
+            >
+                <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.02em' }}>Ctrl</span>
+            </span>
 
             <div style={separatorStyle} />
 
@@ -229,19 +211,11 @@ export function SimulationToolbar({
 
             <div style={{ ...toolbarGroupStyle, gap: 8 }}>
                 <span style={{ color: '#78879a', fontSize: 10, fontWeight: 750, letterSpacing: '0.1em' }}>
-                    POSIÇÃO
+                POSIÇÃO
                 </span>
-                <AxisField axis="x" value={draft.x} onChange={onDraftChange} />
-                <AxisField axis="y" value={draft.y} onChange={onDraftChange} />
-                <AxisField axis="z" value={draft.z} onChange={onDraftChange} />
-            </div>
-
-            <div style={{ flex: 1, minWidth: 12 }} />
-
-            <div style={{ ...toolbarGroupStyle, color: '#8190a2', fontSize: 11, whiteSpace: 'nowrap' }}>
-                <CircleDot size={14} strokeWidth={1.8} />
-                <span>{chargesCount} {chargesCount === 1 ? 'carga' : 'cargas'}</span>
-                <ChevronDown size={14} strokeWidth={1.8} />
+                <AxisField axis="x" value={draft.x} disabled={!selectedChargeId} onChange={onDraftChange} />
+                <AxisField axis="y" value={draft.y} disabled={!selectedChargeId} onChange={onDraftChange} />
+                <AxisField axis="z" value={draft.z} disabled={!selectedChargeId} onChange={onDraftChange} />
             </div>
         </header>
     );

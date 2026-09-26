@@ -23,6 +23,8 @@ export class Charge extends SimulationSceneObject {
         THREE.SphereGeometry,
         THREE.MeshStandardMaterial
     >;
+    private readonly selectionIndicator: THREE.Sprite;
+    private readonly selectionTexture: THREE.CanvasTexture;
 
     public constructor(
         { id, value, color, position, visibility }: ChargeOptions,
@@ -51,7 +53,35 @@ export class Charge extends SimulationSceneObject {
             }),
         );
 
+        const selectionCanvas = document.createElement('canvas');
+        selectionCanvas.width = 64;
+        selectionCanvas.height = 64;
+        const selectionContext = selectionCanvas.getContext('2d');
+
+        if (!selectionContext) {
+            throw new Error('Não foi possível criar o indicador de seleção da carga.');
+        }
+
+        selectionContext.strokeStyle = '#1d65ad';
+        selectionContext.lineWidth = 5;
+        selectionContext.beginPath();
+        selectionContext.arc(32, 32, 25, 0, Math.PI * 2);
+        selectionContext.stroke();
+
+        this.selectionTexture = new THREE.CanvasTexture(selectionCanvas);
+        this.selectionTexture.colorSpace = THREE.SRGBColorSpace;
+        this.selectionIndicator = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: this.selectionTexture,
+            transparent: true,
+            depthTest: false,
+            depthWrite: false,
+        }));
+        this.selectionIndicator.scale.setScalar(appearance.bodyRadius * 2.8);
+        this.selectionIndicator.renderOrder = 20;
+        this.selectionIndicator.visible = false;
+
         this.add(this.body);
+        this.add(this.selectionIndicator);
         this.updateColor();
 
         if (position) {
@@ -85,9 +115,19 @@ export class Charge extends SimulationSceneObject {
         return { ...this.visualizationVisibility };
     }
 
+    public setSelected(selected: boolean): void {
+        this.selectionIndicator.visible = selected;
+    }
+
+    public isSelected(): boolean {
+        return this.selectionIndicator.visible;
+    }
+
     public dispose(): void {
         this.body.geometry.dispose();
         this.body.material.dispose();
+        this.selectionTexture.dispose();
+        this.selectionIndicator.material.dispose();
     }
 
     private updateColor(): void {

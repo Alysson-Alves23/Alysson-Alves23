@@ -20,6 +20,7 @@ import type {
 
 export interface SimulationControlsProps {
     charges: ChargeSummary[];
+    selectedChargeIds: string[];
     selectedChargeId: string | null;
     draft: ChargeDraft;
     onDraftChange: (field: ChargeDraftField, value: string) => void;
@@ -135,6 +136,7 @@ function visibilityButtonStyle(isVisible: boolean): CSSProperties {
 
 export function SimulationControls({
     charges,
+    selectedChargeIds,
     selectedChargeId,
     draft,
     onDraftChange,
@@ -195,7 +197,11 @@ export function SimulationControls({
                                 {openPanel === 'objects' ? 'CENA' : 'INSPECTOR'}
                             </span>
                             <h1 style={{ margin: '4px 0 0', color: '#f1f5fa', fontSize: 16, fontWeight: 700 }}>
-                                {openPanel === 'objects' ? 'Cargas' : selectedChargeId ?? 'Novo componente'}
+                                {openPanel === 'objects'
+                                    ? 'Cargas'
+                                    : selectedChargeIds.length > 1
+                                        ? `${selectedChargeIds.length} cargas selecionadas`
+                                        : selectedChargeId ?? 'Novo componente'}
                             </h1>
                         </div>
                         <button
@@ -228,7 +234,7 @@ export function SimulationControls({
                                 )}
 
                                 {charges.map((charge) => {
-                                    const isSelected = charge.id === selectedChargeId;
+                                    const isSelected = selectedChargeIds.includes(charge.id);
 
                                     return (
                                         <button
@@ -340,8 +346,8 @@ export function SimulationControls({
                             {selectedChargeId && (
                                 <button
                                     type="button"
-                                    title="Remover carga"
-                                    aria-label="Remover carga"
+                                    title={selectedChargeIds.length > 1 ? 'Remover cargas' : 'Remover carga'}
+                                    aria-label={selectedChargeIds.length > 1 ? 'Remover cargas' : 'Remover carga'}
                                     onClick={onRemoveCharge}
                                     style={{
                                         ...iconButtonStyle,
