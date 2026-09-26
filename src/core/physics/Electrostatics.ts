@@ -1,4 +1,5 @@
-import { electrostaticVisualizationDefaults } from './constants';
+import { COULOMB_CONSTANT, electrostaticVisualizationDefaults } from './constants';
+import { sampleElectricField } from './ElectricField';
 import type {
     CartesianCoordinates,
     ElectrostaticCharge,
@@ -39,12 +40,6 @@ function negate(vector: CartesianCoordinates): Vector {
     return [-vector[0], -vector[1], -vector[2]];
 }
 
-function scaleAndAdd(target: Vector, vector: CartesianCoordinates, scale: number): void {
-    target[0] += vector[0] * scale;
-    target[1] += vector[1] * scale;
-    target[2] += vector[2] * scale;
-}
-
 function coordinatesOf(position: CartesianCoordinates): Vector {
     return [position[0], position[1], position[2]];
 }
@@ -80,11 +75,6 @@ export class ElectrostaticVisualizationCalculator {
         const samples: ElectricFieldSample[] = [];
         const spacing = (this.fieldGridSize * 2) / this.fieldGridDivisions;
 
-        charges.forEach((charge) => {
-            if (charge.value === 0) {
-                return;
-            }
-
             for (let row = 0; row <= this.fieldGridDivisions; row += 1) {
                 for (let column = 0; column <= this.fieldGridDivisions; column += 1) {
                     const point: Vector = [
@@ -92,43 +82,21 @@ export class ElectrostaticVisualizationCalculator {
                         0,
                         -this.fieldGridSize + row * spacing,
                     ];
-                    const field = this.calculateFieldAtPoint(point, [charge]);
-                    const magnitude = length(field);
+                    const sample = sampleElectricField(point, charges, this.minimumDistance);
 
-                    if (magnitude < this.minimumFieldMagnitude) {
+                    if (sample.status !== 'valid' || sample.magnitude < this.minimumFieldMagnitude) {
                         continue;
                     }
 
                     samples.push({
-                        chargeId: charge.id,
                         origin: point,
-                        direction: normalize(field),
-                        magnitude,
+                        direction: sample.direction,
+                        vector: sample.vector,
+                        magnitude: sample.magnitude,
                     });
                 }
             }
-        });
-
         return samples;
-    }
-
-    private calculateFieldAtPoint(
-        point: CartesianCoordinates,
-        charges: readonly ElectrostaticCharge[],
-    ): Vector {
-        const field: Vector = [0, 0, 0];
-
-        charges.forEach((charge) => {
-            if (charge.value === 0) {
-                return;
-            }
-
-            const offset = subtract(point, charge.position);
-            const distance = Math.max(length(offset), this.minimumDistance);
-            scaleAndAdd(field, offset, charge.value / distance ** 3);
-        });
-
-        return field;
     }
 
     private calculateForceVectors(
@@ -153,7 +121,7 @@ export class ElectrostaticVisualizationCalculator {
                     ? negate(directionToSecond)
                     : directionToSecond;
                 const secondDirection = negate(firstDirection);
-                const magnitude = Math.abs(chargeProduct) / distance ** 2;
+                const magnitude = COULOMB_CONSTANT * Math.abs(chargeProduct) / distance ** 2;
 
                 vectors.push(
                     {

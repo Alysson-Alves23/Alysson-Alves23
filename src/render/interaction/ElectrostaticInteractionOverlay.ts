@@ -125,11 +125,7 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
 
     private renderElectricField(samples: readonly ElectricFieldSample[]): void {
         samples.forEach((sample) => {
-            if (!this.isLayerVisible(sample.chargeId, 'electricField')) {
-                return;
-            }
-
-            const length = clamp(0.08 + Math.log1p(sample.magnitude) * 0.12, 0.08, 0.55);
+            const length = clamp(0.08 + Math.log1p(sample.magnitude / 1000) * 0.12, 0.08, 0.55);
             const origin = new THREE.Vector3(
                 sample.origin[0],
                 sample.origin[1],
@@ -155,7 +151,7 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
                 return;
             }
 
-            const length = clamp(0.12 + Math.log1p(vector.magnitude) * 0.12, 0.12, 0.5);
+            const length = clamp(0.12 + Math.log1p(vector.magnitude / 0.001) * 0.12, 0.12, 0.5);
             const origin = new THREE.Vector3(
                 vector.origin[0],
                 vector.origin[1],
@@ -222,7 +218,7 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
                 (guide.start[1] + guide.end[1]) / 2 + VISUAL_OFFSET + 0.12,
                 (guide.start[2] + guide.end[2]) / 2,
             );
-            const label = this.createDistanceLabel(`r = ${guide.distance.toFixed(2)} u`);
+            const label = this.createDistanceLabel(`r = ${guide.distance.toFixed(2)} m`);
             label.position.copy(midpoint);
             this.interactionGuidesGroup.add(label);
         });

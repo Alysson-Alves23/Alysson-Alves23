@@ -211,7 +211,7 @@ export function SimulationToolbar({
 
             <div style={{ ...toolbarGroupStyle, gap: 8 }}>
                 <span style={{ color: '#78879a', fontSize: 10, fontWeight: 750, letterSpacing: '0.1em' }}>
-                POSIÇÃO
+                POSIÇÃO (m)
                 </span>
                 <AxisField axis="x" value={draft.x} disabled={!selectedChargeId} onChange={onDraftChange} />
                 <AxisField axis="y" value={draft.y} disabled={!selectedChargeId} onChange={onDraftChange} />

@@ -272,7 +272,7 @@ export function SimulationControls({
                                                     {charge.id}
                                                 </strong>
                                                 <span style={{ display: 'block', marginTop: 2, color: '#8391a3', fontSize: 10 }}>
-                                                    q = {charge.value} · {charge.color}
+                                                    q = {charge.value} µC
                                                 </span>
                                             </span>
                                         </button>
@@ -283,7 +283,7 @@ export function SimulationControls({
                     ) : (
                         <>
                             <label style={{ display: 'grid', gap: 6, color: '#9aa8b9', fontSize: 11 }}>
-                                Valor da carga
+                                Valor da carga (µC)
                                 <input
                                     style={inputStyle}
                                     type="number"

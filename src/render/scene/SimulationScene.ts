@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { MICROCOULOMB } from '../../core/physics/constants';
 import {
     ElectrostaticVisualizationCalculator,
 } from '../../core/physics/Electrostatics';
@@ -81,7 +82,7 @@ export class SimulationScene extends THREE.Scene {
 
                 return {
                     id: charge.chargeId,
-                    value: charge.getValue(),
+                    value: charge.getValue() * MICROCOULOMB,
                     position: [worldPosition.x, worldPosition.y, worldPosition.z] as const,
                 };
             });
