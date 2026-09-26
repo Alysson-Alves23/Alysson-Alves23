@@ -75,27 +75,27 @@ export class ElectrostaticVisualizationCalculator {
         const samples: ElectricFieldSample[] = [];
         const spacing = (this.fieldGridSize * 2) / this.fieldGridDivisions;
 
-            for (let row = 0; row <= this.fieldGridDivisions; row += 1) {
-                for (let column = 0; column <= this.fieldGridDivisions; column += 1) {
-                    const point: Vector = [
-                        -this.fieldGridSize + column * spacing,
-                        0,
-                        -this.fieldGridSize + row * spacing,
-                    ];
-                    const sample = sampleElectricField(point, charges, this.minimumDistance);
+        for (let row = 0; row <= this.fieldGridDivisions; row += 1) {
+            for (let column = 0; column <= this.fieldGridDivisions; column += 1) {
+                const point: Vector = [
+                    -this.fieldGridSize + column * spacing,
+                    0,
+                    -this.fieldGridSize + row * spacing,
+                ];
+                const sample = sampleElectricField(point, charges, this.minimumDistance);
 
-                    if (sample.status !== 'valid' || sample.magnitude < this.minimumFieldMagnitude) {
-                        continue;
-                    }
-
-                    samples.push({
-                        origin: point,
-                        direction: sample.direction,
-                        vector: sample.vector,
-                        magnitude: sample.magnitude,
-                    });
+                if (sample.status !== 'valid' || sample.magnitude < this.minimumFieldMagnitude) {
+                    continue;
                 }
+
+                samples.push({
+                    origin: point,
+                    direction: sample.direction,
+                    vector: sample.vector,
+                    magnitude: sample.magnitude,
+                });
             }
+        }
         return samples;
     }
 

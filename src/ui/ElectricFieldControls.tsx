@@ -112,7 +112,7 @@ export function ElectricFieldControls({ options, state, enabled, charges, appear
                     : reading?.status === 'invalid' ? <p className="field-error">A leitura excede a precisão numérica. Reveja as coordenadas e cargas.</p>
                     : reading && <>
                         <div className="field-result"><span>Resultante |E|</span><strong>{physicalNumber(reading.magnitude)} <small>N/C</small></strong></div>
-                        <div className="field-components">{['Ex', 'Ey', 'Ez'].map((label, index) => <span key={label}>{label}<b>{physicalNumber(reading.vector[index])}</b></span>)}</div>
+                        <div className="field-components" aria-label="Componentes do campo em N/C">{['Ex', 'Ey', 'Ez'].map((label, index) => <span key={label}>{label} (N/C)<b>{physicalNumber(reading.vector[index])}</b></span>)}</div>
                         <div className="field-contributions">{reading.contributions.map(item => {
                             const charge = charges.find(charge => charge.id === item.chargeId);
                             return <div key={item.chargeId}>

@@ -86,7 +86,7 @@ export class SimulationScene extends THREE.Scene {
         if (this.coordinateGrid) {
             const normal = planeAxes(options.plane)[2];
             this.coordinateGrid.rotation.set(options.plane === 'xy' ? Math.PI / 2 : 0, 0, options.plane === 'yz' ? Math.PI / 2 : 0);
-            this.coordinateGrid.position.set(0, 0, 0).setComponent(normal, options.offset - 0.025);
+            this.coordinateGrid.position.set(0, 0, 0).setComponent(normal, options.offset + (options.plane === 'xz' ? 0.025 : -0.025));
             this.coordinateGrid.visible = options.space === 'plane';
         }
     }
@@ -163,7 +163,7 @@ export class SimulationScene extends THREE.Scene {
             new THREE.Color(theme.grid.gridLines)
         );
         grid.name = 'CoordinateGrid';
-        grid.position.y = -0.025;
+        grid.position.y = 0.025;
         this.coordinateGrid = grid;
         this.environmentGroup.add(grid);
     }
