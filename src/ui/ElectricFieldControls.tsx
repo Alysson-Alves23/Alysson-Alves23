@@ -14,7 +14,7 @@ import {
     SlidersHorizontal,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { CartesianCoordinates } from '../core/physics/types';
+import type { CartesianCoordinates } from '../core/physics/electrostatics/types';
 import { planeAxes } from '../render/field/FieldSampling';
 import type { FieldDisplayOptions, FieldViewState } from '../render/types/FieldDisplayOptions';
 import type { SimulationThemeConfig } from '../render/types/SimulationTheme';
@@ -329,7 +329,7 @@ export function ElectricFieldControls({ options, state, enabled, charges, appear
                                 <>
                                     <div className="field-result">
                                         <span>|E|</span>
-                                        <strong>{physicalNumber(reading.magnitude)} <small>N/C</small></strong>
+                                        <strong>{physicalNumber(reading.fieldStrengthNewtonsPerCoulomb)} <small>N/C</small></strong>
                                     </div>
                                     <details className="field-details" open={componentsOpen} onToggle={event => setComponentsOpen(event.currentTarget.open)}>
                                         <summary>
@@ -338,7 +338,7 @@ export function ElectricFieldControls({ options, state, enabled, charges, appear
                                         </summary>
                                         <div className="field-components" aria-label="Componentes do campo em N/C">
                                             {['Ex', 'Ey', 'Ez'].map((label, index) => (
-                                                <span key={label}>{label}<b>{physicalNumber(reading.vector[index])}</b></span>
+                                                <span key={label}>{label}<b>{physicalNumber(reading.electricFieldVector[index])}</b></span>
                                             ))}
                                         </div>
                                     </details>
@@ -363,8 +363,8 @@ export function ElectricFieldControls({ options, state, enabled, charges, appear
                                                                 <i style={{ background: charge?.color }} />
                                                                 {item.chargeId}
                                                             </button>
-                                                            <span title={`(${item.vector.map(physicalNumber).join('; ')}) N/C`}>
-                                                                {physicalNumber(item.magnitude)} N/C
+                                                            <span title={`(${item.electricFieldVector.map(physicalNumber).join('; ')}) N/C`}>
+                                                                {physicalNumber(item.fieldStrengthNewtonsPerCoulomb)} N/C
                                                             </span>
                                                         </div>
                                                     );

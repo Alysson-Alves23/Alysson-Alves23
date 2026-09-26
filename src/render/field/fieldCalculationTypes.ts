@@ -1,4 +1,4 @@
-import type { CartesianCoordinates, ElectrostaticCharge, ElectricFieldSample } from '../../core/physics/types';
+import type { CartesianCoordinates, ElectrostaticCharge, ElectricFieldValue } from '../../core/physics/electrostatics/types';
 
 export type FieldPlane = 'xz' | 'xy' | 'yz';
 
@@ -26,7 +26,7 @@ export interface ElectricFieldLine {
 }
 
 export interface FieldGeometry {
-    samples: ElectricFieldSample[];
+    samples: ElectricFieldValue[];
     lines: ElectricFieldLine[];
     domain: FieldDomain;
     spacing: number;
@@ -38,7 +38,7 @@ export interface FieldCalculationRequest {
     revision: number;
     charges: ElectrostaticCharge[];
     options: FieldSamplingOptions;
-    cutoff: number;
+    chargeDisplayClearanceMeters: number;
 }
 
 export type FieldCalculationResponse =

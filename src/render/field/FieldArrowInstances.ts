@@ -1,5 +1,13 @@
 import * as THREE from 'three';
-import type { CartesianCoordinates } from '../../core/physics/types';
+import type { CartesianCoordinates } from '../../core/physics/electrostatics/types';
+import type { MeasurementLabelData } from '../annotations/MeasurementLabelLayer';
+
+export interface FieldArrowMeasurement {
+    id: string;
+    text: string;
+    kind: MeasurementLabelData['kind'];
+    ownerChargeIds?: readonly string[];
+}
 
 export interface FieldArrow {
     origin: CartesianCoordinates;
@@ -7,6 +15,7 @@ export interface FieldArrow {
     length: number;
     color: THREE.Color;
     width?: number;
+    measurement?: FieldArrowMeasurement;
 }
 
 /** Shared geometry and two draw calls for the complete vector grid. */
@@ -19,10 +28,14 @@ export class FieldArrowInstances extends THREE.Group {
     private capacity = 0;
     private readonly transform = new THREE.Object3D();
     private readonly cylinderAxis = new THREE.Vector3(0, 1, 0);
+    private arrows: readonly FieldArrow[] = [];
+    private measurementAnnotations: MeasurementLabelData[] | null = null;
 
     public constructor(private readonly width: number) { super(); this.allocate(1); }
 
     public setArrows(arrows: readonly FieldArrow[]): void {
+        this.arrows = arrows;
+        this.measurementAnnotations = null;
         if (arrows.length > this.capacity) this.allocate(2 ** Math.ceil(Math.log2(arrows.length)));
         this.shafts.count = this.heads.count = arrows.length;
         arrows.forEach((arrow, index) => {
@@ -47,6 +60,31 @@ export class FieldArrowInstances extends THREE.Group {
             mesh.instanceMatrix.needsUpdate = true;
             if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
         }
+    }
+
+    public getMeasurementAnnotations(): MeasurementLabelData[] {
+        if (this.measurementAnnotations) return this.measurementAnnotations;
+
+        this.updateWorldMatrix(true, false);
+        this.measurementAnnotations = this.arrows.flatMap((arrow) => {
+            if (!arrow.measurement) return [];
+
+            const position = new THREE.Vector3(...arrow.origin).addScaledVector(
+                new THREE.Vector3(...arrow.direction).normalize(),
+                arrow.length * 0.7,
+            );
+            position.applyMatrix4(this.matrixWorld);
+
+            return [{
+                ...arrow.measurement,
+                position: position.toArray() as CartesianCoordinates,
+            }];
+        });
+        return this.measurementAnnotations;
+    }
+
+    public getMeasurementIdAt(instanceId: number): string | null {
+        return this.arrows[instanceId]?.measurement?.id ?? null;
     }
 
     private allocate(capacity: number): void {

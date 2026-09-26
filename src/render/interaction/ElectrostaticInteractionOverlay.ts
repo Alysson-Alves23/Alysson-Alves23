@@ -3,11 +3,12 @@ import type {
     CartesianCoordinates,
     ElectrostaticCharge,
     ElectrostaticInteractionResults,
-} from '../../core/physics/types';
+} from '../../core/physics/electrostatics/types';
 import { normalize } from '../../math/vectorMath';
 import type { VisualizationVisibility } from '../types/VisualizationVisibility';
 import type { SimulationThemeConfig } from '../types/SimulationTheme';
 import { FieldArrowInstances } from '../field/FieldArrowInstances';
+import { formatMeasurement } from '../annotations/MeasurementLabelLayer';
 
 const GUIDE_COLOR = 0xc4ceda;
 const VISUAL_OFFSET = 0.06;
@@ -50,7 +51,7 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
 
     public constructor(
         private readonly appearance: SimulationThemeConfig['force'],
-        private readonly minimumGuideDistance: number,
+        private readonly chargeDisplayClearanceMeters: number,
     ) {
         super();
 
@@ -74,7 +75,7 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
         chargeVisibility: ReadonlyMap<string, VisualizationVisibility>,
     ): void {
         this.interactions = interactions;
-        this.chargePositions = new Map(charges.map(charge => [charge.id, charge.position]));
+        this.chargePositions = new Map(charges.map(charge => [charge.id, charge.positionInMeters]));
         this.chargeVisibility = new Map(chargeVisibility);
     }
 
@@ -121,12 +122,14 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
     private renderForceVectors(contributions: ElectrostaticInteractionResults['forceContributions']): void {
         const finiteVectors = contributions.flatMap(contribution => {
             const origin = this.chargePositions.get(contribution.chargeId);
-            if (!origin || !Number.isFinite(contribution.magnitude) || contribution.magnitude <= 0) return [];
+            if (!origin || !Number.isFinite(contribution.forceMagnitudeNewtons)
+                || contribution.forceMagnitudeNewtons <= 0) return [];
             return [{
                 chargeId: contribution.chargeId,
+                causedByChargeId: contribution.causedByChargeId,
                 origin,
-                direction: normalize(contribution.vector),
-                magnitude: contribution.magnitude,
+                direction: normalize(contribution.forceVectorNewtons),
+                magnitude: contribution.forceMagnitudeNewtons,
             }];
         });
         // Like the probe, all arrows share a linear scale. Include hidden vectors in
@@ -140,6 +143,12 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
                 direction: vector.direction,
                 length: (vector.magnitude / maximum) * this.appearance.maximumLength,
                 color,
+                measurement: {
+                    id: `force:${vector.chargeId}:${vector.causedByChargeId}`,
+                    text: `|F| = ${formatMeasurement(vector.magnitude, 'N')}`,
+                    kind: 'force' as const,
+                    ownerChargeIds: [vector.chargeId],
+                },
             })));
     }
 
@@ -147,7 +156,7 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
         pairDistances.forEach((pairDistance) => {
             const start = this.chargePositions.get(pairDistance.firstChargeId);
             const end = this.chargePositions.get(pairDistance.secondChargeId);
-            if (!start || !end || pairDistance.distance < this.minimumGuideDistance) return;
+            if (!start || !end || pairDistance.distanceMeters < this.chargeDisplayClearanceMeters) return;
             if (
                 !this.isLayerVisible(pairDistance.firstChargeId, 'distanceGuide')
                 && !this.isLayerVisible(pairDistance.secondChargeId, 'distanceGuide')
@@ -180,7 +189,7 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
                 (start[1] + end[1]) / 2 + VISUAL_OFFSET + 0.12,
                 (start[2] + end[2]) / 2,
             );
-            const label = this.createDistanceLabel(`r = ${pairDistance.distance.toFixed(2)} m`);
+            const label = this.createDistanceLabel(`r = ${pairDistance.distanceMeters.toFixed(2)} m`);
             label.position.copy(midpoint);
             this.interactionGuidesGroup.add(label);
         });

@@ -1,11 +1,19 @@
 import * as THREE from 'three';
-import { sampleElectricField } from '../../core/physics/ElectricField';
-import type { CartesianCoordinates, ElectrostaticCharge } from '../../core/physics/types';
+import { readElectricFieldAtPoint } from '../../core/physics/electrostatics/ElectricField';
+import type { CartesianCoordinates, ElectrostaticCharge } from '../../core/physics/electrostatics/types';
+import { distanceBetween } from '../../math/vectorMath';
 import type { FieldCalculationResponse, FieldGeometry } from './fieldCalculationTypes';
 import { planeAxes } from './FieldSampling';
-import { defaultFieldDisplayOptions, type FieldDisplayOptions, type FieldViewState } from '../types/FieldDisplayOptions';
+import {
+    defaultFieldDisplayOptions,
+    type FieldDisplayOptions,
+    type FieldProbeReading,
+    type FieldViewState,
+} from '../types/FieldDisplayOptions';
 import type { SimulationThemeConfig } from '../types/SimulationTheme';
 import { FieldArrowInstances } from './FieldArrowInstances';
+import type { MeasurementLabelData } from '../annotations/MeasurementLabelLayer';
+import { formatMeasurement } from '../annotations/MeasurementLabelLayer';
 import { FieldLinesView } from './FieldLinesView';
 import { FieldProbeView, type ProbeChargeStyle } from './FieldProbeView';
 
@@ -25,7 +33,10 @@ export class ElectricFieldView extends THREE.Group {
     private state: FieldViewState = { busy: false, error: null, colorMaximum: 1, projected: false,
         lineCount: 0, vectorCount: 0, probePosition: [0, 0, 1], reading: null };
 
-    public constructor(private readonly appearance: SimulationThemeConfig['field'], private readonly cutoff: number) {
+    public constructor(
+        private readonly appearance: SimulationThemeConfig['field'],
+        private readonly chargeDisplayClearanceMeters: number,
+    ) {
         super(); this.name = 'ResultantElectricField';
         this.lines = new FieldLinesView(appearance.arrowWidth);
         this.vectors = new FieldArrowInstances(appearance.arrowWidth);
@@ -81,11 +92,56 @@ export class ElectricFieldView extends THREE.Group {
         this.updateProbe();
     }
 
+    public getMeasurementAnnotations(): MeasurementLabelData[] {
+        if (!this.visible) return [];
+
+        return [
+            ...(this.options.vectors ? this.vectors.getMeasurementAnnotations() : []),
+            ...(this.options.probe ? this.probe.getMeasurementAnnotations() : []),
+        ];
+    }
+
+    public getInteractiveArrowGroups(): FieldArrowInstances[] {
+        if (!this.visible) return [];
+
+        return [
+            ...(this.options.vectors ? [this.vectors] : []),
+            ...(this.options.probe ? [this.probe.getArrowInstances()] : []),
+        ];
+    }
+
     private updateProbe(): void {
-        const reading = sampleElectricField(this.state.probePosition, this.charges, this.cutoff);
+        const nearbyChargeIds = this.charges
+            .filter(charge => distanceBetween(this.state.probePosition, charge.positionInMeters)
+                < this.chargeDisplayClearanceMeters)
+            .map(charge => charge.id);
+        const physicalReading = nearbyChargeIds.length === 0
+            ? readElectricFieldAtPoint(this.state.probePosition, this.charges)
+            : null;
+        const reading: FieldProbeReading = physicalReading
+            ? { ...physicalReading, status: 'valid', excludedChargeIds: [] }
+            : this.emptyProbeReading(
+                nearbyChargeIds.length ? 'excluded' : 'invalid',
+                nearbyChargeIds,
+            );
         this.state = { ...this.state, reading };
         this.probe.setReading(reading, this.styles);
         this.notify();
+    }
+
+    private emptyProbeReading(
+        status: FieldProbeReading['status'],
+        excludedChargeIds: string[],
+    ): FieldProbeReading {
+        return {
+            positionInMeters: [...this.state.probePosition],
+            unitDirection: [0, 0, 0],
+            electricFieldVector: [0, 0, 0],
+            fieldStrengthNewtonsPerCoulomb: 0,
+            contributions: [],
+            status,
+            excludedChargeIds,
+        };
     }
 
     private requestGeometry(): void {
@@ -95,7 +151,12 @@ export class ElectricFieldView extends THREE.Group {
         if (signature === this.sampleSignature) return;
         this.sampleSignature = signature;
         this.state = { ...this.state, busy: true, error: null };
-        this.worker.postMessage({ revision: ++this.revision, charges: this.charges, options, cutoff: this.cutoff });
+        this.worker.postMessage({
+            revision: ++this.revision,
+            charges: this.charges,
+            options,
+            chargeDisplayClearanceMeters: this.chargeDisplayClearanceMeters,
+        });
         this.notify();
     }
 
@@ -112,11 +173,18 @@ export class ElectricFieldView extends THREE.Group {
                 .lerp(new THREE.Color(this.appearance.magnitudeColors[index + 1]), value - index);
         };
         this.lines.setField(data, colorAt);
-        this.vectors.setArrows(data.samples.map(sample => ({
-            origin: sample.origin, direction: sample.direction, color: colorAt(sample.magnitude),
+        this.vectors.setArrows(data.samples.map((sample, index) => ({
+            origin: sample.positionInMeters,
+            direction: sample.unitDirection,
+            color: colorAt(sample.fieldStrengthNewtonsPerCoulomb),
             length: data.spacing * (this.options.arrowLength === 'uniform' ? 0.55
-                : 0.12 + this.intensity(sample.magnitude, data.colorMaximum) * 0.58),
+                : 0.12 + this.intensity(sample.fieldStrengthNewtonsPerCoulomb, data.colorMaximum) * 0.58),
             width: Math.min(0.025, data.spacing * 0.024),
+            measurement: {
+                id: `field-vector:${index}`,
+                text: `|E| = ${formatMeasurement(sample.fieldStrengthNewtonsPerCoulomb, 'N/C')}`,
+                kind: 'field-sample',
+            },
         })));
     }
 

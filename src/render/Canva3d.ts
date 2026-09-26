@@ -1,12 +1,13 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three-stdlib';
+import { CSS2DRenderer, OrbitControls } from 'three-stdlib';
 import { SimulationScene } from './scene/SimulationScene';
 import { Charge, type ChargeOptions } from './objects/Charge';
+import type { FieldArrowInstances } from './field/FieldArrowInstances';
 import type { SimulationThemeConfig } from './types/SimulationTheme';
 import type { VisualizationVisibility } from './types/VisualizationVisibility';
 import { defaultFieldDisplayOptions, type FieldDisplayOptions, type FieldViewState } from './types/FieldDisplayOptions';
 import { fieldDomain, planeAxes } from './field/FieldSampling';
-import type { CartesianCoordinates } from '../core/physics/types';
+import type { CartesianCoordinates } from '../core/physics/electrostatics/types';
 
 type ChargeSelectionListener = (charges: Charge[]) => void;
 
@@ -40,6 +41,7 @@ export class Canva3D {
     public readonly scene: SimulationScene;
     public camera: THREE.PerspectiveCamera | THREE.OrthographicCamera;
     public readonly renderer: THREE.WebGLRenderer;
+    public readonly labelRenderer: CSS2DRenderer;
     public readonly controls: OrbitControls;
 
     private readonly resizeObserver: ResizeObserver;
@@ -62,6 +64,8 @@ export class Canva3D {
     private isDraggingProbe = false;
     private readonly probeDragOffset = new THREE.Vector3();
     private viewportAspect = 1;
+    private viewportWidth = 1;
+    private viewportHeight = 1;
 
     public constructor(container: HTMLElement, initialTheme: SimulationThemeConfig) {
         this.scene = new SimulationScene(initialTheme);
@@ -78,7 +82,19 @@ export class Canva3D {
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
         this.renderer.setClearColor(new THREE.Color(initialTheme.background), 1);
+        this.renderer.domElement.style.position = 'absolute';
+        this.renderer.domElement.style.inset = '0';
+        this.renderer.domElement.style.display = 'block';
         container.appendChild(this.renderer.domElement);
+
+        this.labelRenderer = new CSS2DRenderer();
+        Object.assign(this.labelRenderer.domElement.style, {
+            position: 'absolute',
+            inset: '0',
+            zIndex: '1',
+            pointerEvents: 'none',
+        });
+        container.appendChild(this.labelRenderer.domElement);
 
         this.controls = new OrbitControls(this.camera, this.renderer.domElement);
         this.controls.enableDamping = true;
@@ -86,6 +102,7 @@ export class Canva3D {
 
         this.renderer.domElement.addEventListener('pointerdown', this.handlePointerDown, true);
         this.renderer.domElement.addEventListener('pointermove', this.handlePointerMove, true);
+        this.renderer.domElement.addEventListener('pointerleave', this.handlePointerLeave);
         this.renderer.domElement.addEventListener('pointerup', this.handlePointerUp, true);
         this.renderer.domElement.addEventListener('pointercancel', this.handlePointerUp, true);
         this.renderer.domElement.addEventListener('click', this.handleClick);
@@ -94,6 +111,8 @@ export class Canva3D {
             const width = Math.max(container.clientWidth, 1);
             const height = Math.max(container.clientHeight, 1);
 
+            this.viewportWidth = width;
+            this.viewportHeight = height;
             this.viewportAspect = width / height;
             this.perspectiveCamera.aspect = this.viewportAspect;
             this.perspectiveCamera.updateProjectionMatrix();
@@ -101,6 +120,7 @@ export class Canva3D {
             this.planarCamera.right = 6 * this.viewportAspect;
             this.planarCamera.updateProjectionMatrix();
             this.renderer.setSize(width, height, false);
+            this.labelRenderer.setSize(width, height);
         };
 
         this.resizeObserver = new ResizeObserver(resize);
@@ -110,8 +130,14 @@ export class Canva3D {
 
         this.renderer.setAnimationLoop(() => {
             this.controls.update();
-            this.scene.updateVisualizations();
+            this.scene.updateVisualizations(this.camera.up.toArray() as [number, number, number]);
+            this.scene.measurementLabels.updateLayout(
+                this.camera,
+                this.viewportWidth,
+                this.viewportHeight,
+            );
             this.renderer.render(this.scene, this.camera);
+            this.labelRenderer.render(this.scene, this.camera);
         });
     }
 
@@ -147,6 +173,10 @@ export class Canva3D {
         this.scene.setGlobalVisualizationVisibility(visibility);
     }
 
+    public setMeasurementLabelsVisible(visible: boolean): void {
+        this.scene.setMeasurementLabelsVisible(visible);
+    }
+
     public setFieldOptions(options: FieldDisplayOptions): void {
         const changedView = options.space !== this.fieldOptions.space || options.plane !== this.fieldOptions.plane
             || options.offset !== this.fieldOptions.offset || this.camera === this.perspectiveCamera && options.space === 'plane';
@@ -157,7 +187,7 @@ export class Canva3D {
 
     public frameField(): void {
         const charges = this.scene.chargesGroup.children.filter((object): object is Charge => object instanceof Charge);
-        const domain = fieldDomain(charges.map(charge => ({ id: charge.chargeId, value: charge.getValue(), position: charge.position.toArray() })));
+        const domain = fieldDomain(charges.map(charge => charge.position.toArray() as CartesianCoordinates));
         const center = new THREE.Vector3(...domain.center);
         const options = this.fieldOptions;
         if (options.space === 'plane') {
@@ -206,17 +236,21 @@ export class Canva3D {
         this.renderer.setAnimationLoop(null);
         this.renderer.domElement.removeEventListener('pointerdown', this.handlePointerDown, true);
         this.renderer.domElement.removeEventListener('pointermove', this.handlePointerMove, true);
+        this.renderer.domElement.removeEventListener('pointerleave', this.handlePointerLeave);
         this.renderer.domElement.removeEventListener('pointerup', this.handlePointerUp, true);
         this.renderer.domElement.removeEventListener('pointercancel', this.handlePointerUp, true);
         this.renderer.domElement.removeEventListener('click', this.handleClick);
         this.controls.dispose();
         this.scene.fieldView.dispose();
         this.scene.remove(this.scene.fieldView);
+        this.scene.measurementLabels.dispose();
+        this.scene.remove(this.scene.measurementLabels);
         this.scene.electrostaticInteractionOverlay.dispose();
         this.scene.remove(this.scene.electrostaticInteractionOverlay);
         disposeSceneResources(this.scene);
         this.renderer.dispose();
         this.renderer.domElement.remove();
+        this.labelRenderer.domElement.remove();
         this.scene.clear();
         this.chargeMovedListeners.clear();
         this.chargeSelectedListeners.clear();
@@ -280,6 +314,7 @@ export class Canva3D {
             return;
         }
         if (!this.isDraggingSelection) {
+            this.updateHoveredMeasurement(event);
             return;
         }
 
@@ -305,6 +340,10 @@ export class Canva3D {
             this.chargeMovedListeners.forEach((listener) => listener(charge));
         });
         event.preventDefault();
+    };
+
+    private readonly handlePointerLeave = (): void => {
+        this.scene.setHoveredMeasurementLabel(null);
     };
 
     private readonly handlePointerUp = (event: PointerEvent): void => {
@@ -363,17 +402,59 @@ export class Canva3D {
     };
 
     private chargeAt(event: MouseEvent | PointerEvent): Charge | null {
-        const bounds = this.renderer.domElement.getBoundingClientRect();
-        this.pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
-        this.pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
-        this.raycaster.setFromCamera(this.pointer, this.camera);
-
+        if (!this.setRayFromEvent(event)) return null;
         const intersection = this.raycaster.intersectObjects(
             this.scene.chargesGroup.children,
             true,
         )[0];
 
         return intersection ? this.findCharge(intersection.object) : null;
+    }
+
+    private updateHoveredMeasurement(event: PointerEvent): void {
+        if (!this.setRayFromEvent(event)) return;
+
+        let labelId: string | null = null;
+        const probe = this.scene.fieldView.probe;
+        if (probe.visible && this.raycaster.intersectObject(probe.marker, false).length > 0) {
+            labelId = 'probe-field-result';
+        }
+
+        if (!labelId) {
+            const chargeIntersection = this.raycaster.intersectObjects(
+                this.scene.chargesGroup.children,
+                true,
+            )[0];
+            const charge = chargeIntersection ? this.findCharge(chargeIntersection.object) : null;
+            if (charge) labelId = `charge:${charge.chargeId}`;
+        }
+
+        if (!labelId) {
+            const arrowGroups: FieldArrowInstances[] = [
+                this.scene.forceVectorsGroup,
+                ...this.scene.fieldView.getInteractiveArrowGroups(),
+            ];
+
+            for (const arrowGroup of arrowGroups) {
+                const intersections = this.raycaster.intersectObjects(arrowGroup.children, false);
+                const arrowHit = intersections.find(intersection => intersection.instanceId !== undefined);
+                if (arrowHit?.instanceId !== undefined) {
+                    labelId = arrowGroup.getMeasurementIdAt(arrowHit.instanceId);
+                    if (labelId) break;
+                }
+            }
+        }
+
+        this.scene.setHoveredMeasurementLabel(labelId);
+    }
+
+    private setRayFromEvent(event: MouseEvent | PointerEvent): boolean {
+        const bounds = this.renderer.domElement.getBoundingClientRect();
+        if (bounds.width === 0 || bounds.height === 0) return false;
+        this.pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
+        this.pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
+        this.raycaster.setFromCamera(this.pointer, this.camera);
+        return true;
     }
 
     private rayIntersectsDragPlane(
@@ -417,6 +498,7 @@ export class Canva3D {
 
     private notifySelectionChanged(): void {
         const selection = this.getSelectedCharges();
+        this.scene.setSelectedChargeIds(selection.map(charge => charge.chargeId));
         this.chargeSelectedListeners.forEach((listener) => listener(selection));
     }
 

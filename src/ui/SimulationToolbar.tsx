@@ -2,6 +2,7 @@ import {
     Activity,
     ArrowUpRight,
     Ruler,
+    Sigma,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { CSSProperties } from 'react';
@@ -16,8 +17,10 @@ export interface SimulationToolbarProps {
     selectedChargeId: string | null;
     draft: ChargeDraft;
     globalVisibility: ChargeVisibility;
+    showMeasurementLabels: boolean;
     onDraftChange: (field: ChargeDraftField, value: string) => void;
     onToggleGlobalLayer: (layer: VisualizationLayer) => void;
+    onToggleMeasurementLabels: () => void;
 }
 
 const toolbarStyle: CSSProperties = {
@@ -158,8 +161,10 @@ export function SimulationToolbar({
     selectedChargeId,
     draft,
     globalVisibility,
+    showMeasurementLabels,
     onDraftChange,
     onToggleGlobalLayer,
+    onToggleMeasurementLabels,
 }: SimulationToolbarProps) {
     return (
         <header style={toolbarStyle} aria-label="Barra de ferramentas da simulação">
@@ -204,6 +209,18 @@ export function SimulationToolbar({
                     shortcut="R"
                     visible={globalVisibility.distanceGuide}
                     onClick={() => onToggleGlobalLayer('distanceGuide')}
+                />
+            </div>
+
+            <div style={separatorStyle} />
+
+            <div style={toolbarGroupStyle} aria-label="Valores e unidades">
+                <VisibilityToggle
+                    icon={Sigma}
+                    label="Exibir valores e unidades"
+                    shortcut="M"
+                    visible={showMeasurementLabels}
+                    onClick={onToggleMeasurementLabels}
                 />
             </div>
 

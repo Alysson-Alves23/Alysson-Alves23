@@ -3,13 +3,13 @@ import { fieldDomain, planeAxes, sampleFieldGrid } from './FieldSampling';
 import type { FieldCalculationRequest, FieldGeometry } from './fieldCalculationTypes';
 
 export function* generateFieldGeometry(request: FieldCalculationRequest): Generator<void, FieldGeometry> {
-    const { charges, options, cutoff } = request;
-    const domain = fieldDomain(charges);
-    const { samples, spacing } = sampleFieldGrid(charges, options, domain, cutoff);
+    const { charges, options, chargeDisplayClearanceMeters } = request;
+    const domain = fieldDomain(charges.map(charge => charge.positionInMeters));
+    const { samples, spacing } = sampleFieldGrid(charges, options, domain, chargeDisplayClearanceMeters);
     const lines: FieldGeometry['lines'] = [];
-    const intensities = samples.map(sample => sample.magnitude);
+    const intensities = samples.map(sample => sample.fieldStrengthNewtonsPerCoulomb);
     yield;
-    for (const line of traceFieldLines(charges, options, domain, cutoff)) {
+    for (const line of traceFieldLines(charges, options, domain, chargeDisplayClearanceMeters)) {
         if (line) {
             lines.push(line);
             for (let index = 0; index < line.magnitudes.length; index += 8) {
@@ -24,6 +24,7 @@ export function* generateFieldGeometry(request: FieldCalculationRequest): Genera
         samples, lines, domain, spacing,
         colorMaximum: intensities[Math.floor((intensities.length - 1) * 0.95)] || 1,
         projected: options.space === 'plane' && charges.some(charge =>
-            charge.value !== 0 && Math.abs(charge.position[normal] - options.offset) > 1e-8),
+            charge.chargeInCoulombs !== 0
+            && Math.abs(charge.positionInMeters[normal] - options.offset) > 1e-8),
     };
 }

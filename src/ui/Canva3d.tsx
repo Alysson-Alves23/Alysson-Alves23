@@ -89,6 +89,7 @@ export default function Canva3d({
     const [selectedChargeIds, setSelectedChargeIds] = useState<string[]>([]);
     const [selectedChargeId, setSelectedChargeId] = useState<string | null>(null);
     const [draft, setDraft] = useState<ChargeDraft>(initialDraft);
+    const [showMeasurementLabels, setShowMeasurementLabels] = useState(false);
     const [fieldOptions, setFieldOptions] = useState({ ...defaultFieldDisplayOptions });
     const [fieldState, setFieldState] = useState<FieldViewState | null>(null);
     const [globalVisibility, setGlobalVisibility] = useState<ChargeVisibility>({
@@ -307,6 +308,14 @@ export default function Canva3d({
         });
     };
 
+    const handleToggleMeasurementLabels = (): void => {
+        setShowMeasurementLabels((currentVisibility) => {
+            const nextVisibility = !currentVisibility;
+            canvaRef.current?.setMeasurementLabelsVisible(nextVisibility);
+            return nextVisibility;
+        });
+    };
+
     const handleToggleChargeLayer = (layer: VisualizationLayer, chargeId = selectedChargeIdRef.current): void => {
         const charge = chargeId ? chargesRef.current.get(chargeId) : undefined;
 
@@ -364,6 +373,11 @@ export default function Canva3d({
                 return;
             }
 
+            if (key === 'm') {
+                handleToggleMeasurementLabels();
+                return;
+            }
+
             if (globalVisibility.electricField && ['l', 'v', 'p'].includes(key)) {
                 if (key === 'p' && chargesRef.current.size === 0) return;
 
@@ -385,7 +399,7 @@ export default function Canva3d({
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [draft, globalVisibility, selectedChargeId]);
+    }, [draft, globalVisibility, selectedChargeId, showMeasurementLabels]);
 
     return (
         <div
@@ -416,8 +430,10 @@ export default function Canva3d({
                 selectedChargeId={selectedChargeId}
                 draft={draft}
                 globalVisibility={globalVisibility}
+                showMeasurementLabels={showMeasurementLabels}
                 onDraftChange={handleDraftChange}
                 onToggleGlobalLayer={handleToggleGlobalLayer}
+                onToggleMeasurementLabels={handleToggleMeasurementLabels}
             />
             <SimulationControls
                 charges={charges}
