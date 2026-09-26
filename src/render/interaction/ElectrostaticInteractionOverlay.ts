@@ -5,14 +5,11 @@ import type {
     ElectrostaticVisualization,
 } from '../../core/physics/types';
 import type { VisualizationVisibility } from '../types/VisualizationVisibility';
+import type { SimulationThemeConfig } from '../types/SimulationTheme';
+import { FieldArrowInstances } from '../field/FieldArrowInstances';
 
-const FORCE_COLOR = 0xffb347;
 const GUIDE_COLOR = 0xc4ceda;
 const VISUAL_OFFSET = 0.06;
-
-function clamp(value: number, minimum: number, maximum: number): number {
-    return Math.min(Math.max(value, minimum), maximum);
-}
 
 function disposeVisualResources(root: THREE.Object3D): void {
     root.traverse((object) => {
@@ -36,7 +33,7 @@ function disposeVisualResources(root: THREE.Object3D): void {
 }
 
 export class ElectrostaticInteractionOverlay extends THREE.Group {
-    public readonly forceVectorsGroup = new THREE.Group();
+    public readonly forceVectorsGroup: FieldArrowInstances;
     public readonly interactionGuidesGroup = new THREE.Group();
 
     private globalVisibility: VisualizationVisibility = {
@@ -52,10 +49,11 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
     private chargeVisibility = new Map<string, VisualizationVisibility>();
     private lastSignature = '';
 
-    public constructor() {
+    public constructor(private readonly appearance: SimulationThemeConfig['force']) {
         super();
 
         this.name = 'ElectrostaticInteractionOverlay';
+        this.forceVectorsGroup = new FieldArrowInstances(appearance.arrowWidth);
         this.forceVectorsGroup.name = 'ForceVectors';
         this.interactionGuidesGroup.name = 'InteractionGuides';
         this.add(
@@ -100,13 +98,15 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
     }
 
     private clearVisualGroups(): void {
-        [
-            this.forceVectorsGroup,
-            this.interactionGuidesGroup,
-        ].forEach((group) => {
-            group.children.forEach((child) => disposeVisualResources(child));
-            group.clear();
-        });
+        this.forceVectorsGroup.setArrows([]);
+        this.interactionGuidesGroup.children.forEach(child => disposeVisualResources(child));
+        this.interactionGuidesGroup.clear();
+    }
+
+    public dispose(): void {
+        this.clearVisualGroups();
+        this.forceVectorsGroup.dispose();
+        this.clear();
     }
 
     private isLayerVisible(chargeId: string, layer: keyof VisualizationVisibility): boolean {
@@ -114,42 +114,19 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
     }
 
     private renderForceVectors(vectors: readonly ElectrostaticForceVector[]): void {
-        vectors.forEach((vector) => {
-            if (!this.isLayerVisible(vector.chargeId, 'forceVectors')) {
-                return;
-            }
-
-            const length = clamp(0.12 + Math.log1p(vector.magnitude / 0.001) * 0.12, 0.12, 0.5);
-            const origin = new THREE.Vector3(
-                vector.origin[0],
-                vector.origin[1],
-                vector.origin[2],
-            );
-            const arrow = new THREE.ArrowHelper(
-                new THREE.Vector3(...vector.direction),
-                origin,
-                length,
-                FORCE_COLOR,
-                length * 0.32,
-                length * 0.2,
-            );
-            arrow.name = `ElectrostaticForceVector:${vector.chargeId}`;
-            this.configureArrow(arrow);
-            this.forceVectorsGroup.add(arrow);
-        });
-    }
-
-    private configureArrow(arrow: THREE.ArrowHelper): void {
-        arrow.renderOrder = 10;
-        [arrow.line, arrow.cone].forEach((object) => {
-            const materials = Array.isArray(object.material)
-                ? object.material
-                : [object.material];
-            materials.forEach((material) => {
-                material.depthTest = false;
-                material.depthWrite = false;
-            });
-        });
+        const finiteVectors = vectors.filter(vector => Number.isFinite(vector.magnitude) && vector.magnitude > 0);
+        // Like the probe, all arrows share a linear scale. Include hidden vectors in
+        // the reference so toggling visibility never resizes the remaining arrows.
+        const maximum = finiteVectors.reduce((value, vector) => Math.max(value, vector.magnitude), 0);
+        const color = new THREE.Color(this.appearance.color);
+        this.forceVectorsGroup.setArrows(finiteVectors
+            .filter(vector => this.isLayerVisible(vector.chargeId, 'forceVectors'))
+            .map(vector => ({
+                origin: vector.origin,
+                direction: vector.direction,
+                length: (vector.magnitude / maximum) * this.appearance.maximumLength,
+                color,
+            })));
     }
 
     private renderDistanceGuides(guides: readonly ElectrostaticDistanceGuide[]): void {

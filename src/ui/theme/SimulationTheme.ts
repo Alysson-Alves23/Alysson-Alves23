@@ -31,6 +31,11 @@ export const defaultSimulationTheme: SimulationThemeConfig = {
         bodyRoughness: 0.45,
         bodyMetalness: 0.1,
     },
+    force: {
+        color: '#c88720',
+        arrowWidth: 0.0168,
+        maximumLength: 1.5,
+    },
     field: {
         lineColor: '#293746',
         magnitudeColors: ['#2856aa', '#139eaf', '#c58b18', '#bc2945'],

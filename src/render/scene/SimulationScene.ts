@@ -43,7 +43,7 @@ export class SimulationScene extends THREE.Scene {
         this.name = 'SimulationScene';
         this.environmentGroup.name = 'Environment';
         this.chargesGroup.name = 'Charges';
-        this.electrostaticInteractionOverlay = new ElectrostaticInteractionOverlay();
+        this.electrostaticInteractionOverlay = new ElectrostaticInteractionOverlay(theme.force);
         this.fieldView = new ElectricFieldView(theme.field, Math.max(theme.charge.bodyRadius, electrostaticVisualizationDefaults.minimumDistance));
         this.electricFieldGroup = this.fieldView;
         this.forceVectorsGroup = this.electrostaticInteractionOverlay.forceVectorsGroup;

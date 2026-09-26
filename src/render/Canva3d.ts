@@ -212,6 +212,8 @@ export class Canva3D {
         this.controls.dispose();
         this.scene.fieldView.dispose();
         this.scene.remove(this.scene.fieldView);
+        this.scene.electrostaticInteractionOverlay.dispose();
+        this.scene.remove(this.scene.electrostaticInteractionOverlay);
         disposeSceneResources(this.scene);
         this.renderer.dispose();
         this.renderer.domElement.remove();

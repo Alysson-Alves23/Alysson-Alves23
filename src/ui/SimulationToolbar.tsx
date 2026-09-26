@@ -193,7 +193,7 @@ export function SimulationToolbar({
                 />
                 <VisibilityToggle
                     icon={ArrowUpRight}
-                    label="Vetores de força (N)"
+                    label="Vetores de força (N) · escala linear automática"
                     shortcut="F"
                     visible={globalVisibility.forceVectors}
                     onClick={() => onToggleGlobalLayer('forceVectors')}

@@ -9,6 +9,7 @@ O simulador soma o campo de todas as cargas em cada ponto. O painel esquerdo ofe
 - A resultante sempre considera todas as cargas. Ocultar uma contribuição individual esconde apenas sua seta na sonda.
 - Na grade, comprimento uniforme enfatiza direção; comprimento logarítmico enfatiza intensidade. A coloração opcional também usa escala logarítmica, com teto automático no percentil 95 das amostras. Valores acima do teto compartilham a última cor; a leitura física da sonda não é limitada.
 - Na sonda, todos os vetores usam uma única escala linear. O paralelogramo aparece quando existem exatamente duas contribuições não nulas e ambas estão visíveis.
+- As forças usam o mesmo desenho de setas do campo, com escala linear automática própria: a maior força ocupa 1,5 unidade visual e as demais mantêm sua proporção. A escala considera também forças ocultas, evitando saltos ao alternar a visibilidade. Os comprimentos de forças (N) e campos (N/C) não comparam diretamente grandezas de unidades diferentes.
 
 ## Controles
 

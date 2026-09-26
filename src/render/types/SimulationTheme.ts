@@ -33,6 +33,11 @@ export interface SimulationThemeConfig {
         };
     };
     charge: ChargeAppearance;
+    force: {
+        color: SimulationColor;
+        arrowWidth: number;
+        maximumLength: number;
+    };
     field: {
         lineColor: SimulationColor;
         magnitudeColors: [string, string, string, string];
