@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three-stdlib';
-import { SimulationScene } from './SimulationScene';
+import { SimulationScene } from './scene/SimulationScene';
+import type { SimulationThemeConfig } from './types/SimulationTheme';
 
 function disposeSceneResources(scene: THREE.Scene): void {
     scene.traverse((object) => {
@@ -28,8 +29,8 @@ export class Canva3D {
 
     private readonly resizeObserver: ResizeObserver;
 
-    public constructor(container: HTMLElement) {
-        this.scene = new SimulationScene();
+    public constructor(container: HTMLElement, initialTheme: SimulationThemeConfig) {
+        this.scene = new SimulationScene(initialTheme);
         this.camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
         this.camera.position.set(7, 5, 9);
         this.camera.lookAt(0, 0, 0);
@@ -40,13 +41,11 @@ export class Canva3D {
         });
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-        this.renderer.setClearColor(0x0b1020, 1);
+
+        this.renderer.setClearColor(new THREE.Color(initialTheme.background), 1);
         container.appendChild(this.renderer.domElement);
 
-        this.controls = new OrbitControls(
-            this.camera,
-            this.renderer.domElement,
-        );
+        this.controls = new OrbitControls(this.camera, this.renderer.domElement);
         this.controls.enableDamping = true;
         this.controls.target.set(0, 0, 0);
 
