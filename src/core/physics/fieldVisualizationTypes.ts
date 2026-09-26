@@ -18,6 +18,9 @@ export interface ElectricFieldLine {
     magnitudes: number[];
     startChargeId?: string;
     endChargeId?: string;
+    /** Visual connectors only: no field is sampled at the charge singularities. */
+    startAnchor?: CartesianCoordinates;
+    endAnchor?: CartesianCoordinates;
 }
 export interface FieldGeometry {
     samples: ElectricFieldSample[];

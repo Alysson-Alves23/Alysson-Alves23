@@ -1,6 +1,7 @@
 import type { CartesianCoordinates, ElectrostaticCharge } from './types';
 import type { ElectricFieldLine, FieldDomain, FieldSamplingOptions } from './fieldVisualizationTypes';
-import { fieldVectorForDisplay, planeAxes } from './FieldSampling';
+import { planeAxes } from './FieldSampling';
+import { electricFieldVectorAtPoint } from './ElectricField';
 import { add, magnitude, normalize, scale, subtract, type Vector3 } from './vectorMath';
 
 interface Seed { point: Vector3; source: ElectrostaticCharge; }
@@ -15,7 +16,7 @@ function seedsForCharges(
     const weight = sources.reduce((sum, charge) => sum + Math.abs(charge.value) / maximum, 0);
     const budgetScale = Math.min(1, 256 / (base * weight));
     const seeds: Seed[] = [];
-    const [u, v, normal] = planeAxes(options.plane);
+    const [u, v] = planeAxes(options.plane);
     for (const charge of sources) {
         const count = Math.max(1, Math.round(base * Math.abs(charge.value) / maximum * budgetScale));
         for (let index = 0; index < count && seeds.length < 256; index++) {
@@ -32,34 +33,34 @@ function seedsForCharges(
                 direction = [radius * Math.cos(angle), y, radius * Math.sin(angle)];
             }
             const point = add(charge.position, scale(direction, cutoff * 1.08));
-            if (options.space === 'plane') point[normal] = options.offset;
             seeds.push({ point, source: charge });
         }
     }
     return seeds;
 }
 
-function insideDomain(point: CartesianCoordinates, domain: FieldDomain, options: FieldSamplingOptions): boolean {
-    const normal = planeAxes(options.plane)[2];
+function insideDomain(point: CartesianCoordinates, domain: FieldDomain): boolean {
     return point.every((value, axis) => Number.isFinite(value)
-        && (options.space === 'plane' && axis === normal || Math.abs(value - domain.center[axis]) <= domain.halfSize));
+        && Math.abs(value - domain.center[axis]) <= domain.halfSize);
 }
 
 function traceLine(
-    seed: Seed, charges: readonly ElectrostaticCharge[], options: FieldSamplingOptions,
+    seed: Seed, charges: readonly ElectrostaticCharge[],
     domain: FieldDomain, cutoff: number,
 ): ElectricFieldLine | null {
     const sign = Math.sign(seed.source.value);
     const points: CartesianCoordinates[] = [];
     const magnitudes: number[] = [];
     let point = seed.point;
-    let endpoint: string | undefined;
+    let endpoint: ElectrostaticCharge | undefined;
     const directionAt = (p: CartesianCoordinates): Vector3 | null => {
-        const field = fieldVectorForDisplay(p, charges, options, cutoff);
+        const field = electricFieldVectorAtPoint(p, charges, cutoff);
         return field && magnitude(field) > 0 ? scale(normalize(field), sign) : null;
     };
-    for (let index = 0; index < 1100 && insideDomain(point, domain, options); index++) {
-        const field = fieldVectorForDisplay(point, charges, options, cutoff);
+    // Integrate the physical 3D field. Orthographic projection belongs to the camera,
+    // not the ODE: projecting here creates false sinks when a charge is off-plane.
+    for (let index = 0; index < 1100 && insideDomain(point, domain); index++) {
+        const field = electricFieldVectorAtPoint(point, charges, cutoff);
         if (!field || magnitude(field) === 0) break;
         points.push(point);
         magnitudes.push(magnitude(field));
@@ -75,19 +76,21 @@ function traceLine(
             : add(point, scale(k1, step));
         const hit = charges.find(charge => charge.id !== seed.source.id
             && magnitude(subtract(next, charge.position)) <= cutoff * 1.08);
-        if (hit) { endpoint = hit.id; break; }
+        if (hit) { endpoint = hit; break; }
         if (magnitude(subtract(next, point)) < step * 0.05) break;
         if (index > 30 && index % 10 === 0 && points.slice(0, -20).some(old => magnitude(subtract(next, old)) < step * 0.4)) break;
         point = next;
     }
     if (points.length < 3) return null;
     // A reverse trace arriving at a positive source duplicates forward flux lines.
-    if (sign < 0 && endpoint && charges.some(charge => charge.id === endpoint && charge.value > 0)) return null;
+    if (sign < 0 && endpoint && endpoint.value > 0) return null;
     if (sign < 0) {
         points.reverse(); magnitudes.reverse();
-        return { points, magnitudes, startChargeId: endpoint, endChargeId: seed.source.id };
+        return { points, magnitudes, startChargeId: endpoint?.id, endChargeId: seed.source.id,
+            startAnchor: endpoint?.position, endAnchor: seed.source.position };
     }
-    return { points, magnitudes, startChargeId: seed.source.id, endChargeId: endpoint };
+    return { points, magnitudes, startChargeId: seed.source.id, endChargeId: endpoint?.id,
+        startAnchor: seed.source.position, endAnchor: endpoint?.position };
 }
 
 /** Yields per seed so a worker can accept newer requests between bounded batches. */
@@ -97,6 +100,6 @@ export function* traceFieldLines(
 ): Generator<ElectricFieldLine | null> {
     if (!options.lines) return;
     for (const seed of seedsForCharges(charges, options, cutoff)) {
-        yield traceLine(seed, charges, options, domain, cutoff);
+        yield traceLine(seed, charges, domain, cutoff);
     }
 }

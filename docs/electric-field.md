@@ -19,9 +19,9 @@ O simulador soma o campo de todas as cargas em cada ponto. O painel esquerdo ofe
 
 ## Interpretação dos cortes e limites
 
-Quando há cargas fora do corte, linhas e setas representam a **projeção tangencial** do campo nesse plano, indicada no painel. A sonda continua mostrando as três componentes reais. As linhas são integrais da direção do campo, não trajetórias dinâmicas de partículas.
+As curvas sempre seguem o **campo tridimensional real**, inclusive na vista plana, e se conectam às posições reais das cargas. Quando há cargas fora do corte, a câmera mostra uma projeção dessas curvas 3D; elas podem se cruzar na imagem em profundidades diferentes. A grade de setas representa a componente tangencial do campo no corte selecionado, indicada no painel. A sonda continua mostrando as três componentes reais. As linhas são integrais da direção do campo, não trajetórias dinâmicas de partículas.
 
-O domínio acompanha as cargas, com extensão mínima de 8 m. Linhas são interrompidas nos limites do domínio, em regiões de campo nulo e junto às cargas. A região de exclusão tem raio igual ao maior entre o raio visual e 0,2 m; a sonda identifica essa região em vez de inventar uma leitura finita.
+O domínio acompanha as cargas, com extensão mínima de 8 m. A integração é interrompida nos limites do domínio, em regiões de campo nulo e junto às cargas. Segmentos apenas visuais completam a conexão das curvas até o centro das cargas, sem amostrar as singularidades. A região de exclusão tem raio igual ao maior entre o raio visual e 0,2 m; a sonda identifica essa região em vez de inventar uma leitura finita.
 
 O traçado usa RK4, sementes circulares no plano e distribuição esférica de Fibonacci no volume. Integração reversa representa fontes negativas; conexões reversas com fontes positivas são descartadas para evitar duplicar essas linhas. A densidade é ilustrativa, com até 256 sementes e 1100 passos por curva. A grade tem até 841 amostras no plano ou 2197 no volume.
 

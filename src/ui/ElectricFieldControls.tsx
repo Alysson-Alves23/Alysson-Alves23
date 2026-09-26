@@ -47,7 +47,7 @@ export function ElectricFieldControls({ options, state, enabled, charges, appear
     const change = (patch: Partial<FieldDisplayOptions>) => onChange({ ...options, ...patch });
     const reading = state?.reading;
     const normal = planeAxes(options.plane)[2];
-    const projectionLabel = state?.projected ? 'Projeção tangencial no plano' : 'Campo resultante';
+    const projectionLabel = state?.projected ? 'Linhas 3D em vista plana' : 'Campo resultante';
     return <aside className="field-panel" aria-label="Visualização do campo elétrico">
         <button className="field-panel-heading" aria-expanded={open} onClick={() => setOpen(!open)}>
             <span><span className="field-eyebrow">ELETROSTÁTICA</span><strong>Campo elétrico</strong></span>
@@ -92,7 +92,7 @@ export function ElectricFieldControls({ options, state, enabled, charges, appear
                     : !charges.length ? 'Adicione cargas pelo botão +. Valores opostos formam um dipolo.'
                     : <>{projectionLabel}<span>{state?.lineCount ?? 0} linhas · {state?.vectorCount ?? 0} vetores</span></>}
             </div>
-            {state?.projected && <p className="field-note">O corte mostra a componente no plano. A sonda mede também a componente perpendicular.</p>}
+            {state?.projected && <p className="field-note">As curvas seguem o campo 3D até as cargas. A grade mostra a componente no corte; a sonda mede o vetor completo.</p>}
             {options.colorMode === 'magnitude' && <div className="field-legend" aria-label="Escala de intensidade em N/C">
                 <div style={{ background: `linear-gradient(90deg, ${appearance.magnitudeColors.join(',')})` }} />
                 <span>0<span>≥ {physicalNumber(state?.colorMaximum ?? 1)} N/C</span></span>
