@@ -6,6 +6,8 @@ import {
 } from 'react';
 import { Canva3D } from '../render/Canva3d';
 import { Charge } from '../render/objects/Charge';
+import { ElectricFieldControls } from './ElectricFieldControls';
+import { defaultFieldDisplayOptions, type FieldViewState } from '../render/types/FieldDisplayOptions';
 import type { SimulationThemeConfig } from '../render/types/SimulationTheme';
 import { defaultSimulationTheme } from './theme/SimulationTheme';
 import {
@@ -87,6 +89,8 @@ export default function Canva3d({
     const [selectedChargeIds, setSelectedChargeIds] = useState<string[]>([]);
     const [selectedChargeId, setSelectedChargeId] = useState<string | null>(null);
     const [draft, setDraft] = useState<ChargeDraft>(initialDraft);
+    const [fieldOptions, setFieldOptions] = useState({ ...defaultFieldDisplayOptions });
+    const [fieldState, setFieldState] = useState<FieldViewState | null>(null);
     const [globalVisibility, setGlobalVisibility] = useState<ChargeVisibility>({
         electricField: true,
         forceVectors: false,
@@ -103,6 +107,7 @@ export default function Canva3d({
         const canva3D = new Canva3D(container, initialThemeRef.current);
         canva3D.setGlobalVisualizationVisibility({ electricField: true, forceVectors: false, distanceGuide: false });
         canvaRef.current = canva3D;
+        const unsubscribeFromField = canva3D.onFieldStateChanged(setFieldState);
         const unsubscribeFromSelection = canva3D.onChargesSelected((selectedCharges) => {
             const selectedIds = selectedCharges.map((charge) => charge.chargeId);
             const primaryCharge = selectedCharges[selectedCharges.length - 1];
@@ -154,6 +159,7 @@ export default function Canva3d({
         return () => {
             unsubscribeFromSelection();
             unsubscribeFromMovement();
+            unsubscribeFromField();
             canva3D.dispose();
             canvaRef.current = null;
             chargesRef.current.clear();
@@ -161,6 +167,8 @@ export default function Canva3d({
             selectedChargeIdRef.current = null;
         };
     }, []);
+
+    useEffect(() => { canvaRef.current?.setFieldOptions(fieldOptions); }, [fieldOptions]);
 
     const handleDraftChange = (field: ChargeDraftField, value: string): void => {
         setDraft((currentDraft) => ({
@@ -299,8 +307,7 @@ export default function Canva3d({
         });
     };
 
-    const handleToggleChargeLayer = (layer: VisualizationLayer): void => {
-        const chargeId = selectedChargeIdRef.current;
+    const handleToggleChargeLayer = (layer: VisualizationLayer, chargeId = selectedChargeIdRef.current): void => {
         const charge = chargeId ? chargesRef.current.get(chargeId) : undefined;
 
         if (!chargeId || !charge) {
@@ -412,6 +419,13 @@ export default function Canva3d({
                 onRemoveCharge={handleRemoveCharge}
                 onToggleChargeLayer={handleToggleChargeLayer}
             />
+            <ElectricFieldControls options={fieldOptions} state={fieldState} charges={charges}
+                enabled={globalVisibility.electricField} appearance={theme.field}
+                onChange={setFieldOptions}
+                onProbePosition={position => canvaRef.current?.setProbePosition(position)}
+                onFrame={() => canvaRef.current?.frameField()}
+                onEnable={() => handleToggleGlobalLayer('electricField')}
+                onToggleContribution={id => handleToggleChargeLayer('electricField', id)} />
         </div>
     );
 }

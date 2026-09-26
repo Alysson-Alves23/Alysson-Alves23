@@ -312,8 +312,8 @@ export function SimulationControls({
                                     <div style={{ display: 'flex', gap: 7, marginTop: 8 }}>
                                         <button
                                             type="button"
-                                            title="Campo elétrico da carga"
-                                            aria-label="Campo elétrico da carga"
+                                            title="Contribuição na sonda (a resultante sempre inclui esta carga)"
+                                            aria-label="Contribuição da carga na sonda"
                                             aria-pressed={selectedCharge.visibility.electricField}
                                             onClick={() => onToggleChargeLayer('electricField')}
                                             style={visibilityButtonStyle(selectedCharge.visibility.electricField)}
@@ -322,8 +322,8 @@ export function SimulationControls({
                                         </button>
                                         <button
                                             type="button"
-                                            title="Força da carga"
-                                            aria-label="Força da carga"
+                                            title="Força da carga (N)"
+                                            aria-label="Força da carga (N)"
                                             aria-pressed={selectedCharge.visibility.forceVectors}
                                             onClick={() => onToggleChargeLayer('forceVectors')}
                                             style={visibilityButtonStyle(selectedCharge.visibility.forceVectors)}
