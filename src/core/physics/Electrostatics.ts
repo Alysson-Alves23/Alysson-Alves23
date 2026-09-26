@@ -61,9 +61,9 @@ export class ElectrostaticVisualizationCalculator {
             ?? electrostaticVisualizationDefaults.minimumFieldMagnitude;
     }
 
-    public calculate(charges: readonly ElectrostaticCharge[]): ElectrostaticVisualization {
+    public calculate(charges: readonly ElectrostaticCharge[], includeField = true): ElectrostaticVisualization {
         return {
-            electricField: this.calculateElectricField(charges),
+            electricField: includeField ? this.calculateElectricField(charges) : [],
             forceVectors: this.calculateForceVectors(charges),
             distanceGuides: this.calculateDistanceGuides(charges),
         };

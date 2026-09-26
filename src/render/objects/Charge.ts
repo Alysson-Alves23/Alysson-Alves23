@@ -25,6 +25,9 @@ export class Charge extends SimulationSceneObject {
     >;
     private readonly selectionIndicator: THREE.Sprite;
     private readonly selectionTexture: THREE.CanvasTexture;
+    private readonly signSprite: THREE.Sprite;
+    private readonly signCanvas = document.createElement('canvas');
+    private readonly signTexture: THREE.CanvasTexture;
 
     public constructor(
         { id, value, color, position, visibility }: ChargeOptions,
@@ -80,9 +83,18 @@ export class Charge extends SimulationSceneObject {
         this.selectionIndicator.renderOrder = 20;
         this.selectionIndicator.visible = false;
 
+        this.signCanvas.width = this.signCanvas.height = 64;
+        this.signTexture = new THREE.CanvasTexture(this.signCanvas);
+        this.signTexture.colorSpace = THREE.SRGBColorSpace;
+        this.signSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.signTexture, depthTest: false, depthWrite: false }));
+        this.signSprite.scale.setScalar(appearance.bodyRadius * 1.7);
+        this.signSprite.renderOrder = 21;
+
         this.add(this.body);
         this.add(this.selectionIndicator);
+        this.add(this.signSprite);
         this.updateColor();
+        this.updateSign();
 
         if (position) {
             this.position.copy(position);
@@ -92,6 +104,7 @@ export class Charge extends SimulationSceneObject {
     public setValue(value: number): void {
         this.value = value;
         this.updateColor();
+        this.updateSign();
     }
 
     public getValue(): number {
@@ -128,9 +141,21 @@ export class Charge extends SimulationSceneObject {
         this.body.material.dispose();
         this.selectionTexture.dispose();
         this.selectionIndicator.material.dispose();
+        this.signTexture.dispose(); this.signSprite.material.dispose();
     }
 
     private updateColor(): void {
         this.body.material.color.set(this.color);
+    }
+
+    private updateSign(): void {
+        const context = this.signCanvas.getContext('2d');
+        if (!context) return;
+        context.clearRect(0, 0, 64, 64);
+        context.font = 'bold 52px Arial'; context.textAlign = 'center'; context.textBaseline = 'middle';
+        context.lineWidth = 3; context.strokeStyle = '#263242'; context.fillStyle = '#ffffff';
+        const sign = this.value > 0 ? '+' : this.value < 0 ? '−' : '0';
+        context.strokeText(sign, 32, 34); context.fillText(sign, 32, 34);
+        this.signTexture.needsUpdate = true;
     }
 }

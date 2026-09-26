@@ -1,5 +1,8 @@
 import * as THREE from 'three';
-import { MICROCOULOMB } from '../../core/physics/constants';
+import { MICROCOULOMB, electrostaticVisualizationDefaults } from '../../core/physics/constants';
+import { ElectricFieldView } from '../field/ElectricFieldView';
+import { planeAxes } from '../../core/physics/FieldSampling';
+import type { FieldDisplayOptions } from '../types/FieldDisplayOptions';
 import {
     ElectrostaticVisualizationCalculator,
 } from '../../core/physics/Electrostatics';
@@ -21,6 +24,7 @@ export class SimulationScene extends THREE.Scene {
     public readonly electricFieldGroup: THREE.Group;
     public readonly forceVectorsGroup: THREE.Group;
     public readonly interactionGuidesGroup: THREE.Group;
+    public readonly fieldView: ElectricFieldView;
 
     private readonly theme: SimulationThemeConfig;
     private readonly electrostaticCalculator = new ElectrostaticVisualizationCalculator();
@@ -30,6 +34,7 @@ export class SimulationScene extends THREE.Scene {
         distanceGuides: [],
     };
     private lastPhysicsSignature = '';
+    private coordinateGrid: THREE.GridHelper | null = null;
 
     public constructor(theme: SimulationThemeConfig) {
         super();
@@ -39,7 +44,8 @@ export class SimulationScene extends THREE.Scene {
         this.environmentGroup.name = 'Environment';
         this.chargesGroup.name = 'Charges';
         this.electrostaticInteractionOverlay = new ElectrostaticInteractionOverlay();
-        this.electricFieldGroup = this.electrostaticInteractionOverlay.electricFieldGroup;
+        this.fieldView = new ElectricFieldView(theme.field, Math.max(theme.charge.bodyRadius, electrostaticVisualizationDefaults.minimumDistance));
+        this.electricFieldGroup = this.fieldView;
         this.forceVectorsGroup = this.electrostaticInteractionOverlay.forceVectorsGroup;
         this.interactionGuidesGroup = this.electrostaticInteractionOverlay.interactionGuidesGroup;
 
@@ -47,6 +53,7 @@ export class SimulationScene extends THREE.Scene {
             this.environmentGroup,
             this.chargesGroup,
             this.electrostaticInteractionOverlay,
+            this.fieldView,
         );
 
         this.buildEnvironment(theme);
@@ -71,6 +78,17 @@ export class SimulationScene extends THREE.Scene {
         visibility: VisualizationVisibility,
     ): void {
         this.electrostaticInteractionOverlay.setGlobalVisibility(visibility);
+        this.fieldView.visible = visibility.electricField;
+    }
+
+    public setFieldOptions(options: FieldDisplayOptions): void {
+        this.fieldView.setOptions(options);
+        if (this.coordinateGrid) {
+            const normal = planeAxes(options.plane)[2];
+            this.coordinateGrid.rotation.set(options.plane === 'xy' ? Math.PI / 2 : 0, 0, options.plane === 'yz' ? Math.PI / 2 : 0);
+            this.coordinateGrid.position.set(0, 0, 0).setComponent(normal, options.offset - 0.025);
+            this.coordinateGrid.visible = options.space === 'plane';
+        }
     }
 
     public updateVisualizations(): void {
@@ -90,7 +108,7 @@ export class SimulationScene extends THREE.Scene {
 
         if (physicsSignature !== this.lastPhysicsSignature) {
             this.lastPhysicsSignature = physicsSignature;
-            this.electrostaticVisualization = this.electrostaticCalculator.calculate(charges);
+            this.electrostaticVisualization = this.electrostaticCalculator.calculate(charges, false);
         }
 
         const chargeVisibility = new Map(
@@ -103,6 +121,9 @@ export class SimulationScene extends THREE.Scene {
             chargeVisibility,
         );
         this.electrostaticInteractionOverlay.update();
+        this.fieldView.update(charges, new Map(this.chargesGroup.children
+            .filter((object): object is Charge => object instanceof Charge)
+            .map(charge => [charge.chargeId, { color: charge.getColor(), visible: charge.getVisibility().electricField }])));
     }
 
     private buildEnvironment(theme: SimulationThemeConfig): void {
@@ -142,6 +163,8 @@ export class SimulationScene extends THREE.Scene {
             new THREE.Color(theme.grid.gridLines)
         );
         grid.name = 'CoordinateGrid';
+        grid.position.y = -0.025;
+        this.coordinateGrid = grid;
         this.environmentGroup.add(grid);
     }
 }

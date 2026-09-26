@@ -88,7 +88,7 @@ export default function Canva3d({
     const [selectedChargeId, setSelectedChargeId] = useState<string | null>(null);
     const [draft, setDraft] = useState<ChargeDraft>(initialDraft);
     const [globalVisibility, setGlobalVisibility] = useState<ChargeVisibility>({
-        electricField: false,
+        electricField: true,
         forceVectors: false,
         distanceGuide: false,
     });
@@ -101,6 +101,7 @@ export default function Canva3d({
         }
 
         const canva3D = new Canva3D(container, initialThemeRef.current);
+        canva3D.setGlobalVisualizationVisibility({ electricField: true, forceVectors: false, distanceGuide: false });
         canvaRef.current = canva3D;
         const unsubscribeFromSelection = canva3D.onChargesSelected((selectedCharges) => {
             const selectedIds = selectedCharges.map((charge) => charge.chargeId);

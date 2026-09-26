@@ -3,11 +3,9 @@ import type {
     ElectrostaticDistanceGuide,
     ElectrostaticForceVector,
     ElectrostaticVisualization,
-    ElectricFieldSample,
 } from '../../core/physics/types';
 import type { VisualizationVisibility } from '../types/VisualizationVisibility';
 
-const FIELD_COLOR = 0x66d9ef;
 const FORCE_COLOR = 0xffb347;
 const GUIDE_COLOR = 0xc4ceda;
 const VISUAL_OFFSET = 0.06;
@@ -38,7 +36,6 @@ function disposeVisualResources(root: THREE.Object3D): void {
 }
 
 export class ElectrostaticInteractionOverlay extends THREE.Group {
-    public readonly electricFieldGroup = new THREE.Group();
     public readonly forceVectorsGroup = new THREE.Group();
     public readonly interactionGuidesGroup = new THREE.Group();
 
@@ -59,11 +56,9 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
         super();
 
         this.name = 'ElectrostaticInteractionOverlay';
-        this.electricFieldGroup.name = 'ElectricField';
         this.forceVectorsGroup.name = 'ForceVectors';
         this.interactionGuidesGroup.name = 'InteractionGuides';
         this.add(
-            this.electricFieldGroup,
             this.forceVectorsGroup,
             this.interactionGuidesGroup,
         );
@@ -95,10 +90,6 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
         this.lastSignature = signature;
         this.clearVisualGroups();
 
-        if (this.globalVisibility.electricField) {
-            this.renderElectricField(this.visualization.electricField);
-        }
-
         if (this.globalVisibility.forceVectors) {
             this.renderForceVectors(this.visualization.forceVectors);
         }
@@ -110,7 +101,6 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
 
     private clearVisualGroups(): void {
         [
-            this.electricFieldGroup,
             this.forceVectorsGroup,
             this.interactionGuidesGroup,
         ].forEach((group) => {
@@ -121,28 +111,6 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
 
     private isLayerVisible(chargeId: string, layer: keyof VisualizationVisibility): boolean {
         return this.chargeVisibility.get(chargeId)?.[layer] ?? true;
-    }
-
-    private renderElectricField(samples: readonly ElectricFieldSample[]): void {
-        samples.forEach((sample) => {
-            const length = clamp(0.08 + Math.log1p(sample.magnitude / 1000) * 0.12, 0.08, 0.55);
-            const origin = new THREE.Vector3(
-                sample.origin[0],
-                sample.origin[1],
-                sample.origin[2],
-            );
-            const arrow = new THREE.ArrowHelper(
-                new THREE.Vector3(...sample.direction),
-                origin,
-                length,
-                FIELD_COLOR,
-                length * 0.28,
-                length * 0.16,
-            );
-            arrow.name = 'ElectricFieldVector';
-            this.configureArrow(arrow);
-            this.electricFieldGroup.add(arrow);
-        });
     }
 
     private renderForceVectors(vectors: readonly ElectrostaticForceVector[]): void {

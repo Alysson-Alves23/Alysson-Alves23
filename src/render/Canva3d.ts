@@ -4,6 +4,9 @@ import { SimulationScene } from './scene/SimulationScene';
 import { Charge, type ChargeOptions } from './objects/Charge';
 import type { SimulationThemeConfig } from './types/SimulationTheme';
 import type { VisualizationVisibility } from './types/VisualizationVisibility';
+import { defaultFieldDisplayOptions, type FieldDisplayOptions, type FieldViewState } from './types/FieldDisplayOptions';
+import { fieldDomain, planeAxes } from '../core/physics/FieldSampling';
+import type { CartesianCoordinates } from '../core/physics/types';
 
 type ChargeSelectionListener = (charges: Charge[]) => void;
 
@@ -35,7 +38,7 @@ function disposeSceneResources(scene: THREE.Scene): void {
 
 export class Canva3D {
     public readonly scene: SimulationScene;
-    public readonly camera: THREE.PerspectiveCamera;
+    public camera: THREE.PerspectiveCamera | THREE.OrthographicCamera;
     public readonly renderer: THREE.WebGLRenderer;
     public readonly controls: OrbitControls;
 
@@ -53,10 +56,17 @@ export class Canva3D {
     private isDraggingSelection = false;
     private hasDraggedSelection = false;
     private suppressNextClick = false;
+    private readonly perspectiveCamera: THREE.PerspectiveCamera;
+    private readonly planarCamera = new THREE.OrthographicCamera(-6, 6, 6, -6, 0.01, 2000);
+    private fieldOptions = { ...defaultFieldDisplayOptions };
+    private isDraggingProbe = false;
+    private readonly probeDragOffset = new THREE.Vector3();
+    private viewportAspect = 1;
 
     public constructor(container: HTMLElement, initialTheme: SimulationThemeConfig) {
         this.scene = new SimulationScene(initialTheme);
-        this.camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
+        this.perspectiveCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 2000);
+        this.camera = this.perspectiveCamera;
         this.camera.position.set(7, 5, 9);
         this.camera.lookAt(0, 0, 0);
 
@@ -84,14 +94,19 @@ export class Canva3D {
             const width = Math.max(container.clientWidth, 1);
             const height = Math.max(container.clientHeight, 1);
 
-            this.camera.aspect = width / height;
-            this.camera.updateProjectionMatrix();
+            this.viewportAspect = width / height;
+            this.perspectiveCamera.aspect = this.viewportAspect;
+            this.perspectiveCamera.updateProjectionMatrix();
+            this.planarCamera.left = -6 * this.viewportAspect;
+            this.planarCamera.right = 6 * this.viewportAspect;
+            this.planarCamera.updateProjectionMatrix();
             this.renderer.setSize(width, height, false);
         };
 
         this.resizeObserver = new ResizeObserver(resize);
         this.resizeObserver.observe(container);
         resize();
+        this.setFieldOptions(this.fieldOptions);
 
         this.renderer.setAnimationLoop(() => {
             this.controls.update();
@@ -132,6 +147,44 @@ export class Canva3D {
         this.scene.setGlobalVisualizationVisibility(visibility);
     }
 
+    public setFieldOptions(options: FieldDisplayOptions): void {
+        const changedView = options.space !== this.fieldOptions.space || options.plane !== this.fieldOptions.plane
+            || options.offset !== this.fieldOptions.offset || this.camera === this.perspectiveCamera && options.space === 'plane';
+        this.fieldOptions = { ...options };
+        this.scene.setFieldOptions(options);
+        if (changedView) this.frameField();
+    }
+
+    public frameField(): void {
+        const charges = this.scene.chargesGroup.children.filter((object): object is Charge => object instanceof Charge);
+        const domain = fieldDomain(charges.map(charge => ({ id: charge.chargeId, value: charge.getValue(), position: charge.position.toArray() })));
+        const center = new THREE.Vector3(...domain.center);
+        const options = this.fieldOptions;
+        if (options.space === 'plane') {
+            const [u, v, normal] = planeAxes(options.plane);
+            center.setComponent(normal, options.offset);
+            this.camera = this.planarCamera;
+            this.planarCamera.up.set(0, 0, 0).setComponent(v, 1);
+            this.planarCamera.position.copy(center).setComponent(normal, options.offset + (u === 0 && v === 2 ? -100 : 100));
+            this.planarCamera.zoom = Math.min(6, 6 * this.viewportAspect) / (domain.halfSize * 1.25);
+            this.planarCamera.updateProjectionMatrix();
+        } else {
+            this.camera = this.perspectiveCamera;
+            this.camera.position.copy(center).add(new THREE.Vector3(1, 0.8, 1.4).normalize().multiplyScalar(domain.halfSize * 3.8));
+        }
+        this.camera.lookAt(center);
+        this.controls.object = this.camera;
+        this.controls.target.copy(center);
+        this.controls.enableRotate = options.space === 'volume';
+        this.controls.update();
+    }
+
+    public setProbePosition(position: CartesianCoordinates): void { this.scene.fieldView.setProbePosition(position); }
+
+    public onFieldStateChanged(listener: (state: FieldViewState) => void): () => void {
+        return this.scene.fieldView.subscribe(listener);
+    }
+
     public onChargeMoved(listener: (charge: Charge) => void): () => void {
         this.chargeMovedListeners.add(listener);
 
@@ -157,6 +210,8 @@ export class Canva3D {
         this.renderer.domElement.removeEventListener('pointercancel', this.handlePointerUp, true);
         this.renderer.domElement.removeEventListener('click', this.handleClick);
         this.controls.dispose();
+        this.scene.fieldView.dispose();
+        this.scene.remove(this.scene.fieldView);
         disposeSceneResources(this.scene);
         this.renderer.dispose();
         this.renderer.domElement.remove();
@@ -171,6 +226,23 @@ export class Canva3D {
         this.pointerDownCharge = this.chargeAt(event);
         this.hasDraggedSelection = false;
 
+        if (this.scene.fieldView.visible && this.scene.fieldView.probe.visible
+            && this.raycaster.intersectObject(this.scene.fieldView.probe.marker).length > 0) {
+            const position = this.scene.fieldView.probe.position;
+            const normal = this.fieldOptions.space === 'plane'
+                ? new THREE.Vector3().setComponent(planeAxes(this.fieldOptions.plane)[2], 1)
+                : this.camera.getWorldDirection(new THREE.Vector3());
+            this.dragPlane.setFromNormalAndCoplanarPoint(normal, position);
+            if (this.rayIntersectsDragPlane(event, this.dragStartPoint)) {
+                this.probeDragOffset.copy(position).sub(this.dragStartPoint);
+                this.isDraggingProbe = true;
+                this.controls.enabled = false;
+                this.renderer.domElement.setPointerCapture(event.pointerId);
+                event.preventDefault(); event.stopImmediatePropagation();
+                return;
+            }
+        }
+
         if (!event.ctrlKey || !this.pointerDownCharge) {
             return;
         }
@@ -179,7 +251,9 @@ export class Canva3D {
             ? this.selectedCharges
             : new Set([this.pointerDownCharge]);
         const center = this.selectionCenter(chargesToMove);
-        const cameraDirection = this.camera.getWorldDirection(new THREE.Vector3());
+        const cameraDirection = this.fieldOptions.space === 'plane'
+            ? new THREE.Vector3().setComponent(planeAxes(this.fieldOptions.plane)[2], 1)
+            : this.camera.getWorldDirection(new THREE.Vector3());
         this.dragPlane.setFromNormalAndCoplanarPoint(cameraDirection, center);
 
         if (!this.rayIntersectsDragPlane(event, this.dragStartPoint)) {
@@ -197,6 +271,12 @@ export class Canva3D {
     };
 
     private readonly handlePointerMove = (event: PointerEvent): void => {
+        if (this.isDraggingProbe) {
+            const current = new THREE.Vector3();
+            if (this.rayIntersectsDragPlane(event, current)) this.setProbePosition(current.add(this.probeDragOffset).toArray());
+            event.preventDefault(); event.stopImmediatePropagation();
+            return;
+        }
         if (!this.isDraggingSelection) {
             return;
         }
@@ -226,6 +306,13 @@ export class Canva3D {
     };
 
     private readonly handlePointerUp = (event: PointerEvent): void => {
+        if (this.isDraggingProbe) {
+            this.isDraggingProbe = false;
+            this.controls.enabled = true;
+            this.suppressNextClick = true;
+            if (this.renderer.domElement.hasPointerCapture(event.pointerId)) this.renderer.domElement.releasePointerCapture(event.pointerId);
+            return;
+        }
         if (!this.isDraggingSelection) {
             return;
         }

@@ -33,4 +33,13 @@ export interface SimulationThemeConfig {
         };
     };
     charge: ChargeAppearance;
+    field: {
+        lineColor: SimulationColor;
+        magnitudeColors: [string, string, string, string];
+        resultColor: SimulationColor;
+        probeColor: SimulationColor;
+        guideColor: SimulationColor;
+        arrowWidth: number;
+        probeRadius: number;
+    };
 }
