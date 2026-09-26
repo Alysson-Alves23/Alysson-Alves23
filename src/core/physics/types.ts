@@ -4,7 +4,6 @@ export interface ElectrostaticCharge {
     id: string;
     /** Coulombs. Convert presentation units before entering the core. */
     value: number;
-    /** Metres. */
     position: CartesianCoordinates;
 }
 
@@ -28,23 +27,19 @@ export interface ElectricFieldReading extends ElectricFieldSample {
     excludedChargeIds: string[];
 }
 
-export interface ElectrostaticForceVector {
+export interface ElectrostaticForceContribution {
     chargeId: string;
-    origin: CartesianCoordinates;
-    direction: CartesianCoordinates;
+    vector: CartesianCoordinates;
     magnitude: number;
 }
 
-export interface ElectrostaticDistanceGuide {
+export interface ElectrostaticPairDistance {
     firstChargeId: string;
     secondChargeId: string;
-    start: CartesianCoordinates;
-    end: CartesianCoordinates;
     distance: number;
 }
 
-export interface ElectrostaticVisualization {
-    electricField: ElectricFieldSample[];
-    forceVectors: ElectrostaticForceVector[];
-    distanceGuides: ElectrostaticDistanceGuide[];
+export interface ElectrostaticInteractionResults {
+    forceContributions: ElectrostaticForceContribution[];
+    pairDistances: ElectrostaticPairDistance[];
 }

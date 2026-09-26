@@ -1,5 +1,5 @@
-import { generateFieldGeometry } from '../../core/physics/FieldGeometry';
-import type { FieldCalculationRequest, FieldCalculationResponse } from '../../core/physics/fieldVisualizationTypes';
+import { generateFieldGeometry } from './FieldGeometry';
+import type { FieldCalculationRequest, FieldCalculationResponse } from './fieldCalculationTypes';
 
 const workerScope = self as unknown as {
     onmessage: ((event: MessageEvent<FieldCalculationRequest>) => void) | null;

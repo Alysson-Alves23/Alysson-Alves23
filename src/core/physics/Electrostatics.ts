@@ -1,115 +1,42 @@
-import { COULOMB_CONSTANT, electrostaticVisualizationDefaults } from './constants';
-import { sampleElectricField } from './ElectricField';
+import { COULOMB_CONSTANT, electrostaticCalculationDefaults } from './constants';
 import type {
-    CartesianCoordinates,
     ElectrostaticCharge,
-    ElectrostaticDistanceGuide,
-    ElectrostaticForceVector,
-    ElectrostaticVisualization,
-    ElectricFieldSample,
+    ElectrostaticForceContribution,
+    ElectrostaticInteractionResults,
+    ElectrostaticPairDistance,
 } from './types';
+import { magnitude, normalize, scale, subtract } from '../../math/vectorMath';
 
-interface ElectrostaticVisualizationCalculatorOptions {
-    fieldGridSize?: number;
-    fieldGridDivisions?: number;
+interface ElectrostaticInteractionCalculatorOptions {
     minimumDistance?: number;
-    minimumFieldMagnitude?: number;
 }
 
-type Vector = [number, number, number];
-
-function subtract(first: CartesianCoordinates, second: CartesianCoordinates): Vector {
-    return [first[0] - second[0], first[1] - second[1], first[2] - second[2]];
-}
-
-function length(vector: CartesianCoordinates): number {
-    return Math.sqrt(vector[0] ** 2 + vector[1] ** 2 + vector[2] ** 2);
-}
-
-function normalize(vector: CartesianCoordinates): Vector {
-    const magnitude = length(vector);
-
-    if (magnitude === 0) {
-        return [0, 0, 0];
-    }
-
-    return [vector[0] / magnitude, vector[1] / magnitude, vector[2] / magnitude];
-}
-
-function negate(vector: CartesianCoordinates): Vector {
-    return [-vector[0], -vector[1], -vector[2]];
-}
-
-function coordinatesOf(position: CartesianCoordinates): Vector {
-    return [position[0], position[1], position[2]];
-}
-
-export class ElectrostaticVisualizationCalculator {
-    private readonly fieldGridSize: number;
-    private readonly fieldGridDivisions: number;
+export class ElectrostaticInteractionCalculator {
     private readonly minimumDistance: number;
-    private readonly minimumFieldMagnitude: number;
 
-    public constructor(options: ElectrostaticVisualizationCalculatorOptions = {}) {
-        this.fieldGridSize = options.fieldGridSize
-            ?? electrostaticVisualizationDefaults.fieldGridSize;
-        this.fieldGridDivisions = options.fieldGridDivisions
-            ?? electrostaticVisualizationDefaults.fieldGridDivisions;
+    public constructor(options: ElectrostaticInteractionCalculatorOptions = {}) {
         this.minimumDistance = options.minimumDistance
-            ?? electrostaticVisualizationDefaults.minimumDistance;
-        this.minimumFieldMagnitude = options.minimumFieldMagnitude
-            ?? electrostaticVisualizationDefaults.minimumFieldMagnitude;
+            ?? electrostaticCalculationDefaults.minimumDistance;
     }
 
-    public calculate(charges: readonly ElectrostaticCharge[], includeField = true): ElectrostaticVisualization {
+    public calculate(charges: readonly ElectrostaticCharge[]): ElectrostaticInteractionResults {
         return {
-            electricField: includeField ? this.calculateElectricField(charges) : [],
-            forceVectors: this.calculateForceVectors(charges),
-            distanceGuides: this.calculateDistanceGuides(charges),
+            forceContributions: this.calculateForceContributions(charges),
+            pairDistances: this.calculatePairDistances(charges),
         };
     }
 
-    private calculateElectricField(
+    private calculateForceContributions(
         charges: readonly ElectrostaticCharge[],
-    ): ElectricFieldSample[] {
-        const samples: ElectricFieldSample[] = [];
-        const spacing = (this.fieldGridSize * 2) / this.fieldGridDivisions;
-
-        for (let row = 0; row <= this.fieldGridDivisions; row += 1) {
-            for (let column = 0; column <= this.fieldGridDivisions; column += 1) {
-                const point: Vector = [
-                    -this.fieldGridSize + column * spacing,
-                    0,
-                    -this.fieldGridSize + row * spacing,
-                ];
-                const sample = sampleElectricField(point, charges, this.minimumDistance);
-
-                if (sample.status !== 'valid' || sample.magnitude < this.minimumFieldMagnitude) {
-                    continue;
-                }
-
-                samples.push({
-                    origin: point,
-                    direction: sample.direction,
-                    vector: sample.vector,
-                    magnitude: sample.magnitude,
-                });
-            }
-        }
-        return samples;
-    }
-
-    private calculateForceVectors(
-        charges: readonly ElectrostaticCharge[],
-    ): ElectrostaticForceVector[] {
-        const vectors: ElectrostaticForceVector[] = [];
+    ): ElectrostaticForceContribution[] {
+        const contributions: ElectrostaticForceContribution[] = [];
 
         for (let firstIndex = 0; firstIndex < charges.length; firstIndex += 1) {
             for (let secondIndex = firstIndex + 1; secondIndex < charges.length; secondIndex += 1) {
                 const firstCharge = charges[firstIndex];
                 const secondCharge = charges[secondIndex];
                 const offset = subtract(secondCharge.position, firstCharge.position);
-                const distance = length(offset);
+                const distance = magnitude(offset);
                 const chargeProduct = firstCharge.value * secondCharge.value;
 
                 if (distance < this.minimumDistance || chargeProduct === 0) {
@@ -117,57 +44,46 @@ export class ElectrostaticVisualizationCalculator {
                 }
 
                 const directionToSecond = normalize(offset);
-                const firstDirection = chargeProduct > 0
-                    ? negate(directionToSecond)
-                    : directionToSecond;
-                const secondDirection = negate(firstDirection);
-                const magnitude = COULOMB_CONSTANT * Math.abs(chargeProduct) / distance ** 2;
+                const firstDirection = scale(directionToSecond, chargeProduct > 0 ? -1 : 1);
+                const forceMagnitude = COULOMB_CONSTANT * Math.abs(chargeProduct) / distance ** 2;
+                const firstForce = scale(firstDirection, forceMagnitude);
 
-                vectors.push(
+                contributions.push(
                     {
                         chargeId: firstCharge.id,
-                        origin: coordinatesOf(firstCharge.position),
-                        direction: firstDirection,
-                        magnitude,
+                        vector: firstForce,
+                        magnitude: forceMagnitude,
                     },
                     {
                         chargeId: secondCharge.id,
-                        origin: coordinatesOf(secondCharge.position),
-                        direction: secondDirection,
-                        magnitude,
+                        vector: scale(firstForce, -1),
+                        magnitude: forceMagnitude,
                     },
                 );
             }
         }
 
-        return vectors;
+        return contributions;
     }
 
-    private calculateDistanceGuides(
+    private calculatePairDistances(
         charges: readonly ElectrostaticCharge[],
-    ): ElectrostaticDistanceGuide[] {
-        const guides: ElectrostaticDistanceGuide[] = [];
+    ): ElectrostaticPairDistance[] {
+        const distances: ElectrostaticPairDistance[] = [];
 
         for (let firstIndex = 0; firstIndex < charges.length; firstIndex += 1) {
             for (let secondIndex = firstIndex + 1; secondIndex < charges.length; secondIndex += 1) {
                 const firstCharge = charges[firstIndex];
                 const secondCharge = charges[secondIndex];
-                const distance = length(subtract(secondCharge.position, firstCharge.position));
-
-                if (distance < this.minimumDistance) {
-                    continue;
-                }
-
-                guides.push({
+                const distance = magnitude(subtract(secondCharge.position, firstCharge.position));
+                distances.push({
                     firstChargeId: firstCharge.id,
                     secondChargeId: secondCharge.id,
-                    start: coordinatesOf(firstCharge.position),
-                    end: coordinatesOf(secondCharge.position),
                     distance,
                 });
             }
         }
 
-        return guides;
+        return distances;
     }
 }

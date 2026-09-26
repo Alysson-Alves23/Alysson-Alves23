@@ -5,7 +5,7 @@ import { Charge, type ChargeOptions } from './objects/Charge';
 import type { SimulationThemeConfig } from './types/SimulationTheme';
 import type { VisualizationVisibility } from './types/VisualizationVisibility';
 import { defaultFieldDisplayOptions, type FieldDisplayOptions, type FieldViewState } from './types/FieldDisplayOptions';
-import { fieldDomain, planeAxes } from '../core/physics/FieldSampling';
+import { fieldDomain, planeAxes } from './field/FieldSampling';
 import type { CartesianCoordinates } from '../core/physics/types';
 
 type ChargeSelectionListener = (charges: Charge[]) => void;

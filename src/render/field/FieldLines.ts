@@ -1,8 +1,8 @@
-import type { CartesianCoordinates, ElectrostaticCharge } from './types';
-import type { ElectricFieldLine, FieldDomain, FieldSamplingOptions } from './fieldVisualizationTypes';
+import type { CartesianCoordinates, ElectrostaticCharge } from '../../core/physics/types';
+import type { ElectricFieldLine, FieldDomain, FieldSamplingOptions } from './fieldCalculationTypes';
 import { planeAxes } from './FieldSampling';
-import { electricFieldVectorAtPoint } from './ElectricField';
-import { add, magnitude, normalize, scale, subtract, type Vector3 } from './vectorMath';
+import { electricFieldVectorAtPoint } from '../../core/physics/ElectricField';
+import { add, magnitude, normalize, scale, subtract, type Vector3 } from '../../math/vectorMath';
 
 interface Seed { point: Vector3; source: ElectrostaticCharge; }
 
@@ -57,8 +57,6 @@ function traceLine(
         const field = electricFieldVectorAtPoint(p, charges, cutoff);
         return field && magnitude(field) > 0 ? scale(normalize(field), sign) : null;
     };
-    // Integrate the physical 3D field. Orthographic projection belongs to the camera,
-    // not the ODE: projecting here creates false sinks when a charge is off-plane.
     for (let index = 0; index < 1100 && insideDomain(point, domain); index++) {
         const field = electricFieldVectorAtPoint(point, charges, cutoff);
         if (!field || magnitude(field) === 0) break;
@@ -82,7 +80,6 @@ function traceLine(
         point = next;
     }
     if (points.length < 3) return null;
-    // A reverse trace arriving at a positive source duplicates forward flux lines.
     if (sign < 0 && endpoint && endpoint.value > 0) return null;
     if (sign < 0) {
         points.reverse(); magnitudes.reverse();
@@ -93,7 +90,6 @@ function traceLine(
         startAnchor: seed.source.position, endAnchor: endpoint?.position };
 }
 
-/** Yields per seed so a worker can accept newer requests between bounded batches. */
 export function* traceFieldLines(
     charges: readonly ElectrostaticCharge[], options: FieldSamplingOptions,
     domain: FieldDomain, cutoff: number,

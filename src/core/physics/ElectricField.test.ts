@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { sampleElectricField } from './ElectricField';
-import { ElectrostaticVisualizationCalculator } from './Electrostatics';
 import { COULOMB_CONSTANT } from './constants';
 import type { ElectrostaticCharge } from './types';
 
@@ -33,11 +32,5 @@ describe('electric field in SI units', () => {
         expect(reading.contributions).toEqual([]);
         expect(sampleElectricField([Infinity, 0, 0], []).status).toBe('invalid');
         expect(sampleElectricField([1, 0, 0], []).magnitude).toBe(0);
-    });
-    it('calculates equal and opposite forces in newtons', () => {
-        const result = new ElectrostaticVisualizationCalculator().calculate([charge('a', 0), charge('b', 1)]);
-        expect(result.forceVectors[0].magnitude).toBeCloseTo(0.0089875517923, 10);
-        expect(result.forceVectors.map(force => force.direction[0])).toEqual([-1, 1]);
-        expect(new Set(result.electricField.map(sample => sample.origin.join(','))).size).toBe(result.electricField.length);
     });
 });

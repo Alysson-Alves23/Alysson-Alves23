@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { sampleElectricField } from '../../core/physics/ElectricField';
 import type { CartesianCoordinates, ElectrostaticCharge } from '../../core/physics/types';
-import type { FieldCalculationResponse, FieldGeometry } from '../../core/physics/fieldVisualizationTypes';
-import { planeAxes } from '../../core/physics/FieldSampling';
+import type { FieldCalculationResponse, FieldGeometry } from './fieldCalculationTypes';
+import { planeAxes } from './FieldSampling';
 import { defaultFieldDisplayOptions, type FieldDisplayOptions, type FieldViewState } from '../types/FieldDisplayOptions';
 import type { SimulationThemeConfig } from '../types/SimulationTheme';
 import { FieldArrowInstances } from './FieldArrowInstances';

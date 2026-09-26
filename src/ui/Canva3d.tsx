@@ -364,6 +364,17 @@ export default function Canva3d({
                 return;
             }
 
+            if (globalVisibility.electricField && ['l', 'v', 'p'].includes(key)) {
+                if (key === 'p' && chargesRef.current.size === 0) return;
+
+                const fieldOption = key === 'l' ? 'lines' : key === 'v' ? 'vectors' : 'probe';
+                setFieldOptions(currentOptions => ({
+                    ...currentOptions,
+                    [fieldOption]: !currentOptions[fieldOption],
+                }));
+                return;
+            }
+
             if (event.shiftKey && key === 'a') {
                 event.preventDefault();
                 handleAddCharge();
@@ -424,7 +435,6 @@ export default function Canva3d({
                 onChange={setFieldOptions}
                 onProbePosition={position => canvaRef.current?.setProbePosition(position)}
                 onFrame={() => canvaRef.current?.frameField()}
-                onEnable={() => handleToggleGlobalLayer('electricField')}
                 onToggleContribution={id => handleToggleChargeLayer('electricField', id)} />
         </div>
     );

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { generateFieldGeometry } from './FieldGeometry';
-import type { FieldSamplingOptions } from './fieldVisualizationTypes';
-import type { ElectrostaticCharge } from './types';
+import type { FieldSamplingOptions } from './fieldCalculationTypes';
+import type { ElectrostaticCharge } from '../../core/physics/types';
 
 const options: FieldSamplingOptions = { space: 'plane', plane: 'xz', offset: 0, density: 'low', lines: true, vectors: true };
 const calculate = (charges: ElectrostaticCharge[], overrides: Partial<FieldSamplingOptions> = {}) => {

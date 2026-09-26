@@ -1,6 +1,6 @@
 import { traceFieldLines } from './FieldLines';
 import { fieldDomain, planeAxes, sampleFieldGrid } from './FieldSampling';
-import type { FieldCalculationRequest, FieldGeometry } from './fieldVisualizationTypes';
+import type { FieldCalculationRequest, FieldGeometry } from './fieldCalculationTypes';
 
 export function* generateFieldGeometry(request: FieldCalculationRequest): Generator<void, FieldGeometry> {
     const { charges, options, cutoff } = request;

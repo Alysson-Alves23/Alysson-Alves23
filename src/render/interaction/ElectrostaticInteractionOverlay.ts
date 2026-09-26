@@ -1,15 +1,17 @@
 import * as THREE from 'three';
 import type {
-    ElectrostaticDistanceGuide,
-    ElectrostaticForceVector,
-    ElectrostaticVisualization,
+    CartesianCoordinates,
+    ElectrostaticCharge,
+    ElectrostaticInteractionResults,
 } from '../../core/physics/types';
+import { normalize } from '../../math/vectorMath';
 import type { VisualizationVisibility } from '../types/VisualizationVisibility';
 import type { SimulationThemeConfig } from '../types/SimulationTheme';
 import { FieldArrowInstances } from '../field/FieldArrowInstances';
 
 const GUIDE_COLOR = 0xc4ceda;
 const VISUAL_OFFSET = 0.06;
+const EMPTY_INTERACTIONS: ElectrostaticInteractionResults = { forceContributions: [], pairDistances: [] };
 
 function disposeVisualResources(root: THREE.Object3D): void {
     root.traverse((object) => {
@@ -41,15 +43,15 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
         forceVectors: false,
         distanceGuide: false,
     };
-    private visualization: ElectrostaticVisualization = {
-        electricField: [],
-        forceVectors: [],
-        distanceGuides: [],
-    };
+    private interactions = EMPTY_INTERACTIONS;
+    private chargePositions = new Map<string, CartesianCoordinates>();
     private chargeVisibility = new Map<string, VisualizationVisibility>();
     private lastSignature = '';
 
-    public constructor(private readonly appearance: SimulationThemeConfig['force']) {
+    public constructor(
+        private readonly appearance: SimulationThemeConfig['force'],
+        private readonly minimumGuideDistance: number,
+    ) {
         super();
 
         this.name = 'ElectrostaticInteractionOverlay';
@@ -66,18 +68,21 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
         this.globalVisibility = { ...visibility };
     }
 
-    public setVisualization(
-        visualization: ElectrostaticVisualization,
+    public setInteractions(
+        interactions: ElectrostaticInteractionResults,
+        charges: readonly ElectrostaticCharge[],
         chargeVisibility: ReadonlyMap<string, VisualizationVisibility>,
     ): void {
-        this.visualization = visualization;
+        this.interactions = interactions;
+        this.chargePositions = new Map(charges.map(charge => [charge.id, charge.position]));
         this.chargeVisibility = new Map(chargeVisibility);
     }
 
     public update(): void {
         const signature = JSON.stringify({
             globalVisibility: this.globalVisibility,
-            visualization: this.visualization,
+            interactions: this.interactions,
+            chargePositions: Array.from(this.chargePositions.entries()),
             chargeVisibility: Array.from(this.chargeVisibility.entries()),
         });
 
@@ -89,11 +94,11 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
         this.clearVisualGroups();
 
         if (this.globalVisibility.forceVectors) {
-            this.renderForceVectors(this.visualization.forceVectors);
+            this.renderForceVectors(this.interactions.forceContributions);
         }
 
         if (this.globalVisibility.distanceGuide) {
-            this.renderDistanceGuides(this.visualization.distanceGuides);
+            this.renderDistanceGuides(this.interactions.pairDistances);
         }
     }
 
@@ -113,8 +118,17 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
         return this.chargeVisibility.get(chargeId)?.[layer] ?? true;
     }
 
-    private renderForceVectors(vectors: readonly ElectrostaticForceVector[]): void {
-        const finiteVectors = vectors.filter(vector => Number.isFinite(vector.magnitude) && vector.magnitude > 0);
+    private renderForceVectors(contributions: ElectrostaticInteractionResults['forceContributions']): void {
+        const finiteVectors = contributions.flatMap(contribution => {
+            const origin = this.chargePositions.get(contribution.chargeId);
+            if (!origin || !Number.isFinite(contribution.magnitude) || contribution.magnitude <= 0) return [];
+            return [{
+                chargeId: contribution.chargeId,
+                origin,
+                direction: normalize(contribution.vector),
+                magnitude: contribution.magnitude,
+            }];
+        });
         // Like the probe, all arrows share a linear scale. Include hidden vectors in
         // the reference so toggling visibility never resizes the remaining arrows.
         const maximum = finiteVectors.reduce((value, vector) => Math.max(value, vector.magnitude), 0);
@@ -129,19 +143,22 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
             })));
     }
 
-    private renderDistanceGuides(guides: readonly ElectrostaticDistanceGuide[]): void {
-        guides.forEach((guide) => {
+    private renderDistanceGuides(pairDistances: ElectrostaticInteractionResults['pairDistances']): void {
+        pairDistances.forEach((pairDistance) => {
+            const start = this.chargePositions.get(pairDistance.firstChargeId);
+            const end = this.chargePositions.get(pairDistance.secondChargeId);
+            if (!start || !end || pairDistance.distance < this.minimumGuideDistance) return;
             if (
-                !this.isLayerVisible(guide.firstChargeId, 'distanceGuide')
-                && !this.isLayerVisible(guide.secondChargeId, 'distanceGuide')
+                !this.isLayerVisible(pairDistance.firstChargeId, 'distanceGuide')
+                && !this.isLayerVisible(pairDistance.secondChargeId, 'distanceGuide')
             ) {
                 return;
             }
 
             const line = new THREE.Line(
                 new THREE.BufferGeometry().setFromPoints([
-                    new THREE.Vector3(guide.start[0], guide.start[1], guide.start[2]),
-                    new THREE.Vector3(guide.end[0], guide.end[1], guide.end[2]),
+                    new THREE.Vector3(start[0], start[1], start[2]),
+                    new THREE.Vector3(end[0], end[1], end[2]),
                 ]),
                 new THREE.LineDashedMaterial({
                     color: GUIDE_COLOR,
@@ -159,11 +176,11 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
             this.interactionGuidesGroup.add(line);
 
             const midpoint = new THREE.Vector3(
-                (guide.start[0] + guide.end[0]) / 2,
-                (guide.start[1] + guide.end[1]) / 2 + VISUAL_OFFSET + 0.12,
-                (guide.start[2] + guide.end[2]) / 2,
+                (start[0] + end[0]) / 2,
+                (start[1] + end[1]) / 2 + VISUAL_OFFSET + 0.12,
+                (start[2] + end[2]) / 2,
             );
-            const label = this.createDistanceLabel(`r = ${guide.distance.toFixed(2)} m`);
+            const label = this.createDistanceLabel(`r = ${pairDistance.distance.toFixed(2)} m`);
             label.position.copy(midpoint);
             this.interactionGuidesGroup.add(label);
         });

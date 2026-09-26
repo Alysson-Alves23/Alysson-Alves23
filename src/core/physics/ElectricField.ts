@@ -1,6 +1,6 @@
-import { COULOMB_CONSTANT, electrostaticVisualizationDefaults } from './constants';
+import { COULOMB_CONSTANT, electrostaticCalculationDefaults } from './constants';
 import type { CartesianCoordinates, ElectrostaticCharge, ElectricFieldReading } from './types';
-import { add, magnitude, normalize, scale, subtract, type Vector3 } from './vectorMath';
+import { add, magnitude, normalize, scale, subtract, type Vector3 } from '../../math/vectorMath';
 
 function contributionAt(point: CartesianCoordinates, charge: ElectrostaticCharge): Vector3 {
     if (charge.value === 0) return [0, 0, 0];
@@ -13,7 +13,7 @@ function contributionAt(point: CartesianCoordinates, charge: ElectrostaticCharge
 export function electricFieldVectorAtPoint(
     point: CartesianCoordinates,
     charges: readonly ElectrostaticCharge[],
-    cutoff = electrostaticVisualizationDefaults.minimumDistance,
+    cutoff = electrostaticCalculationDefaults.minimumDistance,
 ): Vector3 | null {
     if (!point.every(Number.isFinite)) return null;
     let field: Vector3 = [0, 0, 0];
@@ -33,7 +33,7 @@ export function electricFieldVectorAtPoint(
 export function sampleElectricField(
     point: CartesianCoordinates,
     charges: readonly ElectrostaticCharge[],
-    cutoff = electrostaticVisualizationDefaults.minimumDistance,
+    cutoff = electrostaticCalculationDefaults.minimumDistance,
 ): ElectricFieldReading {
     const excludedChargeIds = charges.filter(charge =>
         magnitude(subtract(point, charge.position)) < cutoff,

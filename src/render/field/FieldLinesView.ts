@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { FieldGeometry } from '../../core/physics/fieldVisualizationTypes';
+import type { FieldGeometry } from './fieldCalculationTypes';
 import { FieldArrowInstances, type FieldArrow } from './FieldArrowInstances';
 
 export class FieldLinesView extends THREE.Group {

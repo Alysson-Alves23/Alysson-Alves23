@@ -1,14 +1,10 @@
 import * as THREE from 'three';
-import { MICROCOULOMB, electrostaticVisualizationDefaults } from '../../core/physics/constants';
+import { MICROCOULOMB, electrostaticCalculationDefaults } from '../../core/physics/constants';
 import { ElectricFieldView } from '../field/ElectricFieldView';
-import { planeAxes } from '../../core/physics/FieldSampling';
+import { planeAxes } from '../field/FieldSampling';
 import type { FieldDisplayOptions } from '../types/FieldDisplayOptions';
-import {
-    ElectrostaticVisualizationCalculator,
-} from '../../core/physics/Electrostatics';
-import type {
-    ElectrostaticVisualization,
-} from '../../core/physics/types';
+import { ElectrostaticInteractionCalculator } from '../../core/physics/Electrostatics';
+import type { ElectrostaticInteractionResults } from '../../core/physics/types';
 import {
     Charge,
     type ChargeOptions,
@@ -27,11 +23,10 @@ export class SimulationScene extends THREE.Scene {
     public readonly fieldView: ElectricFieldView;
 
     private readonly theme: SimulationThemeConfig;
-    private readonly electrostaticCalculator = new ElectrostaticVisualizationCalculator();
-    private electrostaticVisualization: ElectrostaticVisualization = {
-        electricField: [],
-        forceVectors: [],
-        distanceGuides: [],
+    private readonly electrostaticCalculator: ElectrostaticInteractionCalculator;
+    private electrostaticInteractions: ElectrostaticInteractionResults = {
+        forceContributions: [],
+        pairDistances: [],
     };
     private lastPhysicsSignature = '';
     private coordinateGrid: THREE.GridHelper | null = null;
@@ -40,11 +35,13 @@ export class SimulationScene extends THREE.Scene {
         super();
 
         this.theme = theme;
+        const minimumDistance = Math.max(theme.charge.bodyRadius, electrostaticCalculationDefaults.minimumDistance);
+        this.electrostaticCalculator = new ElectrostaticInteractionCalculator({ minimumDistance });
         this.name = 'SimulationScene';
         this.environmentGroup.name = 'Environment';
         this.chargesGroup.name = 'Charges';
-        this.electrostaticInteractionOverlay = new ElectrostaticInteractionOverlay(theme.force);
-        this.fieldView = new ElectricFieldView(theme.field, Math.max(theme.charge.bodyRadius, electrostaticVisualizationDefaults.minimumDistance));
+        this.electrostaticInteractionOverlay = new ElectrostaticInteractionOverlay(theme.force, minimumDistance);
+        this.fieldView = new ElectricFieldView(theme.field, minimumDistance);
         this.electricFieldGroup = this.fieldView;
         this.forceVectorsGroup = this.electrostaticInteractionOverlay.forceVectorsGroup;
         this.interactionGuidesGroup = this.electrostaticInteractionOverlay.interactionGuidesGroup;
@@ -108,7 +105,7 @@ export class SimulationScene extends THREE.Scene {
 
         if (physicsSignature !== this.lastPhysicsSignature) {
             this.lastPhysicsSignature = physicsSignature;
-            this.electrostaticVisualization = this.electrostaticCalculator.calculate(charges, false);
+            this.electrostaticInteractions = this.electrostaticCalculator.calculate(charges);
         }
 
         const chargeVisibility = new Map(
@@ -116,8 +113,9 @@ export class SimulationScene extends THREE.Scene {
                 .filter((object): object is Charge => object instanceof Charge)
                 .map((charge) => [charge.chargeId, charge.getVisibility()] as const),
         );
-        this.electrostaticInteractionOverlay.setVisualization(
-            this.electrostaticVisualization,
+        this.electrostaticInteractionOverlay.setInteractions(
+            this.electrostaticInteractions,
+            charges,
             chargeVisibility,
         );
         this.electrostaticInteractionOverlay.update();

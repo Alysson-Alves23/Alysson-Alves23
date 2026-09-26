@@ -1,5 +1,5 @@
 import type { CartesianCoordinates, ElectricFieldReading } from '../../core/physics/types';
-import type { FieldSamplingOptions } from '../../core/physics/fieldVisualizationTypes';
+import type { FieldSamplingOptions } from '../field/fieldCalculationTypes';
 
 export interface FieldDisplayOptions extends FieldSamplingOptions {
     arrowLength: 'uniform' | 'logarithmic';

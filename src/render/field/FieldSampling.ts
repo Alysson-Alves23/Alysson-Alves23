@@ -1,7 +1,7 @@
-import { electricFieldVectorAtPoint } from './ElectricField';
-import type { CartesianCoordinates, ElectrostaticCharge, ElectricFieldSample } from './types';
-import type { FieldDomain, FieldPlane, FieldSamplingOptions } from './fieldVisualizationTypes';
-import { magnitude, normalize, type Vector3 } from './vectorMath';
+import { electricFieldVectorAtPoint } from '../../core/physics/ElectricField';
+import type { CartesianCoordinates, ElectrostaticCharge, ElectricFieldSample } from '../../core/physics/types';
+import type { FieldDomain, FieldPlane, FieldSamplingOptions } from './fieldCalculationTypes';
+import { magnitude, normalize, type Vector3 } from '../../math/vectorMath';
 
 export function planeAxes(plane: FieldPlane): [number, number, number] {
     return plane === 'xy' ? [0, 1, 2] : plane === 'yz' ? [1, 2, 0] : [0, 2, 1];
