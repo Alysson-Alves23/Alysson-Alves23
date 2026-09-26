@@ -36,6 +36,7 @@ export class SimulationScene extends THREE.Scene {
 
     public removeCharge(charge: Charge): void {
         this.chargesGroup.remove(charge);
+        charge.dispose();
     }
 
     private buildEnvironment(theme: SimulationThemeConfig): void {

@@ -1,7 +1,7 @@
 import type { SimulationThemeConfig } from '../../render/types/SimulationTheme';
 
 export const defaultSimulationTheme: SimulationThemeConfig = {
-    background: '#0b1020',
+    background: '#b8b5b5',
     grid: {
         centerLine: '#405070',
         gridLines: '#1e2a42',
@@ -25,15 +25,10 @@ export const defaultSimulationTheme: SimulationThemeConfig = {
     charge: {
         positiveColor: '#ff3b30',
         negativeColor: '#3478f6',
-        bodyRadius: 0.25,
+        bodyRadius: 0.1,
         bodyWidthSegments: 32,
         bodyHeightSegments: 16,
         bodyRoughness: 0.45,
         bodyMetalness: 0.1,
-        haloScale: 1.35,
-        haloWidthSegments: 24,
-        haloHeightSegments: 12,
-        haloOpacity: 0.14,
-        haloWireframe: true,
     },
 };

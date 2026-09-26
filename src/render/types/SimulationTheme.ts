@@ -8,11 +8,6 @@ export interface ChargeAppearance {
     bodyHeightSegments: number;
     bodyRoughness: number;
     bodyMetalness: number;
-    haloScale: number;
-    haloWidthSegments: number;
-    haloHeightSegments: number;
-    haloOpacity: number;
-    haloWireframe: boolean;
 }
 
 export interface SimulationThemeConfig {

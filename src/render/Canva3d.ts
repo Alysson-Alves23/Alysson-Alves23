@@ -1,7 +1,16 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three-stdlib';
+import { OrbitControls, TransformControls } from 'three-stdlib';
 import { SimulationScene } from './scene/SimulationScene';
+import { Charge, type ChargeOptions } from './objects/Charge';
 import type { SimulationThemeConfig } from './types/SimulationTheme';
+
+interface TransformControlsEvents {
+    addEventListener(
+        type: 'dragging-changed',
+        listener: (event: { value: boolean }) => void,
+    ): void;
+    addEventListener(type: 'objectChange', listener: () => void): void;
+}
 
 function disposeSceneResources(scene: THREE.Scene): void {
     scene.traverse((object) => {
@@ -26,8 +35,14 @@ export class Canva3D {
     public readonly camera: THREE.PerspectiveCamera;
     public readonly renderer: THREE.WebGLRenderer;
     public readonly controls: OrbitControls;
+    public readonly transformControls: TransformControls;
 
     private readonly resizeObserver: ResizeObserver;
+    private readonly chargeMovedListeners = new Set<(charge: Charge) => void>();
+    private readonly chargeSelectedListeners = new Set<(charge: Charge | null) => void>();
+    private readonly raycaster = new THREE.Raycaster();
+    private readonly pointer = new THREE.Vector2();
+    private selectedCharge: Charge | null = null;
 
     public constructor(container: HTMLElement, initialTheme: SimulationThemeConfig) {
         this.scene = new SimulationScene(initialTheme);
@@ -49,6 +64,43 @@ export class Canva3D {
         this.controls.enableDamping = true;
         this.controls.target.set(0, 0, 0);
 
+        this.renderer.domElement.addEventListener('click', (event) => {
+            const bounds = this.renderer.domElement.getBoundingClientRect();
+            this.pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
+            this.pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
+            this.raycaster.setFromCamera(this.pointer, this.camera);
+
+            const intersection = this.raycaster.intersectObjects(
+                this.scene.chargesGroup.children,
+                true,
+            )[0];
+            const charge = intersection ? this.findCharge(intersection.object) : null;
+
+            this.selectCharge(charge);
+            this.chargeSelectedListeners.forEach((listener) => listener(charge));
+        });
+
+        this.transformControls = new TransformControls(
+            this.camera,
+            this.renderer.domElement,
+        );
+        this.transformControls.setMode('translate');
+        this.scene.add(this.transformControls);
+
+        const transformControlsEvents = this.transformControls as unknown as TransformControlsEvents;
+        transformControlsEvents.addEventListener('dragging-changed', (event) => {
+            this.controls.enabled = !event.value;
+        });
+        transformControlsEvents.addEventListener('objectChange', () => {
+            const selectedCharge = this.selectedCharge;
+
+            if (selectedCharge) {
+                this.chargeMovedListeners.forEach((listener) => {
+                    listener(selectedCharge);
+                });
+            }
+        });
+
         const resize = (): void => {
             const width = Math.max(container.clientWidth, 1);
             const height = Math.max(container.clientHeight, 1);
@@ -68,13 +120,69 @@ export class Canva3D {
         });
     }
 
+    public createCharge(options: ChargeOptions): Charge {
+        return this.scene.createCharge(options);
+    }
+
+    public removeCharge(charge: Charge): void {
+        if (this.selectedCharge === charge) {
+            this.selectCharge(null);
+        }
+
+        this.scene.removeCharge(charge);
+    }
+
+    public selectCharge(charge: Charge | null): void {
+        this.selectedCharge = charge;
+
+        if (charge) {
+            this.transformControls.attach(charge);
+        } else {
+            this.transformControls.detach();
+        }
+    }
+
+    public onChargeMoved(listener: (charge: Charge) => void): () => void {
+        this.chargeMovedListeners.add(listener);
+
+        return () => {
+            this.chargeMovedListeners.delete(listener);
+        };
+    }
+
+    public onChargeSelected(listener: (charge: Charge | null) => void): () => void {
+        this.chargeSelectedListeners.add(listener);
+
+        return () => {
+            this.chargeSelectedListeners.delete(listener);
+        };
+    }
+
     public dispose(): void {
         this.resizeObserver.disconnect();
         this.renderer.setAnimationLoop(null);
+        this.transformControls.dispose();
         this.controls.dispose();
         disposeSceneResources(this.scene);
         this.renderer.dispose();
         this.renderer.domElement.remove();
         this.scene.clear();
+        this.chargeMovedListeners.clear();
+        this.chargeSelectedListeners.clear();
+        this.selectedCharge = null;
+    }
+
+    private findCharge(object: THREE.Object3D): Charge | null {
+        let current: THREE.Object3D | null = object;
+
+        while (current) {
+            if (current instanceof Charge) {
+                return current;
+            }
+
+            current = current.parent;
+        }
+
+        return null;
     }
 }

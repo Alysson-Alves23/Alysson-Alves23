@@ -5,28 +5,31 @@ import type { ChargeAppearance } from '../types/SimulationTheme';
 export interface ChargeOptions {
     id: string;
     value: number;
+    color?: string;
     position?: THREE.Vector3;
 }
 
 export class Charge extends SimulationSceneObject {
+    public readonly chargeId: string;
     private value: number;
+    private color: string;
     private readonly appearance: ChargeAppearance;
     private readonly body: THREE.Mesh<
         THREE.SphereGeometry,
         THREE.MeshStandardMaterial
     >;
-    private readonly halo: THREE.Mesh<
-        THREE.SphereGeometry,
-        THREE.MeshBasicMaterial
-    >;
 
     public constructor(
-        { id, value, position }: ChargeOptions,
+        { id, value, color, position }: ChargeOptions,
         appearance: ChargeAppearance,
     ) {
         super(`Charge:${id}`);
 
+        this.chargeId = id;
         this.value = value;
+        this.color = color ?? String(
+            value >= 0 ? appearance.positiveColor : appearance.negativeColor,
+        );
         this.appearance = appearance;
         this.body = new THREE.Mesh(
             new THREE.SphereGeometry(
@@ -39,21 +42,8 @@ export class Charge extends SimulationSceneObject {
                 metalness: appearance.bodyMetalness,
             }),
         );
-        this.halo = new THREE.Mesh(
-            new THREE.SphereGeometry(
-                appearance.bodyRadius,
-                appearance.haloWidthSegments,
-                appearance.haloHeightSegments,
-            ),
-            new THREE.MeshBasicMaterial({
-                transparent: true,
-                opacity: appearance.haloOpacity,
-                wireframe: appearance.haloWireframe,
-            }),
-        );
-        this.halo.scale.setScalar(appearance.haloScale);
 
-        this.add(this.halo, this.body);
+        this.add(this.body);
         this.updateColor();
 
         if (position) {
@@ -66,12 +56,25 @@ export class Charge extends SimulationSceneObject {
         this.updateColor();
     }
 
-    private updateColor(): void {
-        const color = this.value >= 0
-            ? this.appearance.positiveColor
-            : this.appearance.negativeColor;
+    public getValue(): number {
+        return this.value;
+    }
 
-        this.body.material.color.set(color);
-        this.halo.material.color.set(color);
+    public setColor(color: string): void {
+        this.color = color;
+        this.updateColor();
+    }
+
+    public getColor(): string {
+        return this.color;
+    }
+
+    public dispose(): void {
+        this.body.geometry.dispose();
+        this.body.material.dispose();
+    }
+
+    private updateColor(): void {
+        this.body.material.color.set(this.color);
     }
 }
