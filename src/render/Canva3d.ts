@@ -3,6 +3,7 @@ import { OrbitControls, TransformControls } from 'three-stdlib';
 import { SimulationScene } from './scene/SimulationScene';
 import { Charge, type ChargeOptions } from './objects/Charge';
 import type { SimulationThemeConfig } from './types/SimulationTheme';
+import type { VisualizationVisibility } from './types/VisualizationVisibility';
 
 interface TransformControlsEvents {
     addEventListener(
@@ -20,10 +21,18 @@ function disposeSceneResources(scene: THREE.Scene): void {
             object instanceof THREE.Points
         ) {
             object.geometry.dispose();
+        }
 
+        if (
+            object instanceof THREE.Mesh ||
+            object instanceof THREE.Line ||
+            object instanceof THREE.Points ||
+            object instanceof THREE.Sprite
+        ) {
             if (Array.isArray(object.material)) {
                 object.material.forEach((material) => material.dispose());
             } else {
+                object.material.map?.dispose();
                 object.material.dispose();
             }
         }
@@ -117,6 +126,7 @@ export class Canva3D {
 
         this.renderer.setAnimationLoop(() => {
             this.controls.update();
+            this.scene.updateVisualizations();
             this.renderer.render(this.scene, this.camera);
         });
     }
@@ -151,6 +161,12 @@ export class Canva3D {
         } else {
             this.transformControls.detach();
         }
+    }
+
+    public setGlobalVisualizationVisibility(
+        visibility: VisualizationVisibility,
+    ): void {
+        this.scene.setGlobalVisualizationVisibility(visibility);
     }
 
     public onChargeMoved(listener: (charge: Charge) => void): () => void {

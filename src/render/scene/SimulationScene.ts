@@ -3,11 +3,17 @@ import {
     Charge,
     type ChargeOptions,
 } from '../objects/Charge';
+import { ElectrostaticInteractionOverlay } from '../interaction/ElectrostaticInteractionOverlay';
 import type { SimulationThemeConfig } from '../types/SimulationTheme';
+import type { VisualizationVisibility } from '../types/VisualizationVisibility';
 
 export class SimulationScene extends THREE.Scene {
     public readonly environmentGroup = new THREE.Group();
     public readonly chargesGroup = new THREE.Group();
+    public readonly electrostaticInteractionOverlay: ElectrostaticInteractionOverlay;
+    public readonly electricFieldGroup: THREE.Group;
+    public readonly forceVectorsGroup: THREE.Group;
+    public readonly interactionGuidesGroup: THREE.Group;
 
     private readonly theme: SimulationThemeConfig;
 
@@ -18,8 +24,18 @@ export class SimulationScene extends THREE.Scene {
         this.name = 'SimulationScene';
         this.environmentGroup.name = 'Environment';
         this.chargesGroup.name = 'Charges';
+        this.electrostaticInteractionOverlay = new ElectrostaticInteractionOverlay(
+            this.chargesGroup,
+        );
+        this.electricFieldGroup = this.electrostaticInteractionOverlay.electricFieldGroup;
+        this.forceVectorsGroup = this.electrostaticInteractionOverlay.forceVectorsGroup;
+        this.interactionGuidesGroup = this.electrostaticInteractionOverlay.interactionGuidesGroup;
 
-        this.add(this.environmentGroup, this.chargesGroup);
+        this.add(
+            this.environmentGroup,
+            this.chargesGroup,
+            this.electrostaticInteractionOverlay,
+        );
 
         this.buildEnvironment(theme);
     }
@@ -37,6 +53,16 @@ export class SimulationScene extends THREE.Scene {
     public removeCharge(charge: Charge): void {
         this.chargesGroup.remove(charge);
         charge.dispose();
+    }
+
+    public setGlobalVisualizationVisibility(
+        visibility: VisualizationVisibility,
+    ): void {
+        this.electrostaticInteractionOverlay.setGlobalVisibility(visibility);
+    }
+
+    public updateVisualizations(): void {
+        this.electrostaticInteractionOverlay.update();
     }
 
     private buildEnvironment(theme: SimulationThemeConfig): void {

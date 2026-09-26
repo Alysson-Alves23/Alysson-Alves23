@@ -1,31 +1,41 @@
 import * as THREE from 'three';
 import { SimulationSceneObject } from '../scene/SimulationSceneObject';
 import type { ChargeAppearance } from '../types/SimulationTheme';
+import {
+    defaultVisualizationVisibility,
+    type VisualizationVisibility,
+} from '../types/VisualizationVisibility';
 
 export interface ChargeOptions {
     id: string;
     value: number;
     color?: string;
     position?: THREE.Vector3;
+    visibility?: VisualizationVisibility;
 }
 
 export class Charge extends SimulationSceneObject {
     public readonly chargeId: string;
     private value: number;
     private color: string;
+    private visualizationVisibility: VisualizationVisibility;
     private readonly body: THREE.Mesh<
         THREE.SphereGeometry,
         THREE.MeshStandardMaterial
     >;
 
     public constructor(
-        { id, value, color, position }: ChargeOptions,
+        { id, value, color, position, visibility }: ChargeOptions,
         appearance: ChargeAppearance,
     ) {
         super(`Charge:${id}`);
 
         this.chargeId = id;
         this.value = value;
+        this.visualizationVisibility = {
+            ...defaultVisualizationVisibility,
+            ...visibility,
+        };
         this.color = color ?? String(
             value >= 0 ? appearance.positiveColor : appearance.negativeColor,
         );
@@ -65,6 +75,14 @@ export class Charge extends SimulationSceneObject {
 
     public getColor(): string {
         return this.color;
+    }
+
+    public setVisibility(visibility: VisualizationVisibility): void {
+        this.visualizationVisibility = { ...visibility };
+    }
+
+    public getVisibility(): VisualizationVisibility {
+        return { ...this.visualizationVisibility };
     }
 
     public dispose(): void {

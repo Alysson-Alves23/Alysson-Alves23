@@ -84,7 +84,9 @@ export default function Canva3d({
     const [draft, setDraft] = useState<ChargeDraft>(initialDraft);
     const [activeTool, setActiveTool] = useState<SimulationTool>('select');
     const [globalVisibility, setGlobalVisibility] = useState<ChargeVisibility>({
-        ...defaultChargeVisibility,
+        electricField: false,
+        forceVectors: false,
+        distanceGuide: false,
     });
 
     useEffect(() => {
@@ -218,6 +220,7 @@ export default function Canva3d({
             id,
             value: parsedDraft.value,
             color: parsedDraft.color,
+            visibility: { ...defaultChargeVisibility },
         });
         charge.position.set(parsedDraft.x, parsedDraft.y, parsedDraft.z);
         chargesRef.current.set(id, charge);
@@ -233,7 +236,7 @@ export default function Canva3d({
                 value: parsedDraft.value,
                 color: parsedDraft.color,
                 position: positionOf(charge),
-                visibility: { ...globalVisibility },
+                visibility: { ...defaultChargeVisibility },
             },
         ]);
     };
@@ -294,27 +297,35 @@ export default function Canva3d({
     };
 
     const handleToggleGlobalLayer = (layer: VisualizationLayer): void => {
-        setGlobalVisibility((currentVisibility) => ({
-            ...currentVisibility,
-            [layer]: !currentVisibility[layer],
-        }));
+        setGlobalVisibility((currentVisibility) => {
+            const nextVisibility = {
+                ...currentVisibility,
+                [layer]: !currentVisibility[layer],
+            };
+            canvaRef.current?.setGlobalVisualizationVisibility(nextVisibility);
+            return nextVisibility;
+        });
     };
 
     const handleToggleChargeLayer = (layer: VisualizationLayer): void => {
         const chargeId = selectedChargeIdRef.current;
+        const charge = chargeId ? chargesRef.current.get(chargeId) : undefined;
 
-        if (!chargeId) {
+        if (!chargeId || !charge) {
             return;
         }
+
+        const nextVisibility = {
+            ...charge.getVisibility(),
+            [layer]: !charge.getVisibility()[layer],
+        };
+        charge.setVisibility(nextVisibility);
 
         setCharges((currentCharges) => currentCharges.map((charge) => (
             charge.id === chargeId
                 ? {
                     ...charge,
-                    visibility: {
-                        ...charge.visibility,
-                        [layer]: !charge.visibility[layer],
-                    },
+                    visibility: nextVisibility,
                 }
                 : charge
         )));
