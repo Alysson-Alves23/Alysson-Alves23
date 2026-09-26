@@ -1,16 +1,12 @@
-export type VisualizationLayer = 'electricField' | 'forceVectors' | 'distanceGuide';
+import type { VisualizationVisibility } from '../render/types/VisualizationVisibility';
 
-export interface ChargeVisibility {
-    electricField: boolean;
-    forceVectors: boolean;
-    distanceGuide: boolean;
-}
+export { defaultVisualizationVisibility as defaultChargeVisibility } from '../render/types/VisualizationVisibility';
+export type {
+    VisualizationLayer,
+    VisualizationVisibility,
+} from '../render/types/VisualizationVisibility';
 
-export const defaultChargeVisibility: ChargeVisibility = {
-    electricField: false,
-    forceVectors: false,
-    distanceGuide: false,
-};
+export type ChargeVisibility = VisualizationVisibility;
 
 export interface ChargeSummary {
     id: string;
