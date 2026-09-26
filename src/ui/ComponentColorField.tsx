@@ -4,6 +4,7 @@ export interface ComponentColorFieldProps {
     label: string;
     value: string;
     onChange: (color: string) => void;
+    compact?: boolean;
 }
 
 const fieldStyle: CSSProperties = {
@@ -19,7 +20,30 @@ export function ComponentColorField({
     label,
     value,
     onChange,
+    compact = false,
 }: ComponentColorFieldProps) {
+    if (compact) {
+        return (
+            <label title={label} style={{ display: 'inline-flex', cursor: 'pointer' }}>
+                <input
+                    aria-label={label}
+                    type="color"
+                    value={value}
+                    onChange={(event) => onChange(event.target.value)}
+                    style={{
+                        width: 28,
+                        height: 28,
+                        padding: 2,
+                        background: '#171d25',
+                        border: '1px solid #3a4655',
+                        borderRadius: 6,
+                        cursor: 'pointer',
+                    }}
+                />
+            </label>
+        );
+    }
+
     return (
         <label style={fieldStyle}>
             <span>{label}</span>

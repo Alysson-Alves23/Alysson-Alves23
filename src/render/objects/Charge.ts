@@ -13,7 +13,6 @@ export class Charge extends SimulationSceneObject {
     public readonly chargeId: string;
     private value: number;
     private color: string;
-    private readonly appearance: ChargeAppearance;
     private readonly body: THREE.Mesh<
         THREE.SphereGeometry,
         THREE.MeshStandardMaterial
@@ -30,7 +29,6 @@ export class Charge extends SimulationSceneObject {
         this.color = color ?? String(
             value >= 0 ? appearance.positiveColor : appearance.negativeColor,
         );
-        this.appearance = appearance;
         this.body = new THREE.Mesh(
             new THREE.SphereGeometry(
                 appearance.bodyRadius,

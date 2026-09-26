@@ -1,13 +1,20 @@
 import {
-    Check,
+    Activity,
+    ArrowUpRight,
     ChevronDown,
     CircleDot,
     MousePointer2,
     Move,
-    Plus,
+    Ruler,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import type { CSSProperties } from 'react';
-import type { ChargeDraft, ChargeDraftField } from './simulationTypes';
+import type {
+    ChargeDraft,
+    ChargeDraftField,
+    ChargeVisibility,
+    VisualizationLayer,
+} from './simulationTypes';
 
 export type SimulationTool = 'select' | 'move';
 
@@ -15,10 +22,9 @@ export interface SimulationToolbarProps {
     activeTool: SimulationTool;
     chargesCount: number;
     draft: ChargeDraft;
-    hasSelectedCharge: boolean;
-    onAddCharge: () => void;
-    onApplyPosition: () => void;
+    globalVisibility: ChargeVisibility;
     onDraftChange: (field: ChargeDraftField, value: string) => void;
+    onToggleGlobalLayer: (layer: VisualizationLayer) => void;
     onToolChange: (tool: SimulationTool) => void;
 }
 
@@ -99,6 +105,40 @@ function toolButtonStyle(isActive: boolean): CSSProperties {
     };
 }
 
+function VisibilityToggle({
+    icon: Icon,
+    label,
+    shortcut,
+    visible,
+    onClick,
+}: {
+    icon: LucideIcon;
+    label: string;
+    shortcut: string;
+    visible: boolean;
+    onClick: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            title={`${label} (${shortcut})`}
+            aria-label={`${label}: ${visible ? 'visível' : 'oculto'}`}
+            aria-pressed={visible}
+            onClick={onClick}
+            style={{
+                ...toolButtonBaseStyle,
+                width: 32,
+                padding: 0,
+                color: visible ? '#f5f8fc' : '#78879a',
+                background: visible ? '#2c5f93' : 'transparent',
+                borderColor: visible ? '#3e83c4' : 'transparent',
+            }}
+        >
+            <Icon size={16} strokeWidth={1.9} />
+        </button>
+    );
+}
+
 function AxisField({
     axis,
     value,
@@ -127,10 +167,9 @@ export function SimulationToolbar({
     activeTool,
     chargesCount,
     draft,
-    hasSelectedCharge,
-    onAddCharge,
-    onApplyPosition,
+    globalVisibility,
     onDraftChange,
+    onToggleGlobalLayer,
     onToolChange,
 }: SimulationToolbarProps) {
     return (
@@ -139,7 +178,7 @@ export function SimulationToolbar({
                 <button
                     style={toolButtonStyle(activeTool === 'select')}
                     type="button"
-                    title="Selecionar carga"
+                    title="Selecionar carga (V)"
                     aria-label="Selecionar carga"
                     aria-pressed={activeTool === 'select'}
                     onClick={() => onToolChange('select')}
@@ -150,7 +189,7 @@ export function SimulationToolbar({
                 <button
                     style={toolButtonStyle(activeTool === 'move')}
                     type="button"
-                    title="Mover carga"
+                    title="Mover carga (G)"
                     aria-label="Mover carga"
                     aria-pressed={activeTool === 'move'}
                     onClick={() => onToolChange('move')}
@@ -158,16 +197,32 @@ export function SimulationToolbar({
                     <Move size={16} strokeWidth={1.9} />
                     <span>Mover</span>
                 </button>
-                <button
-                    style={toolButtonBaseStyle}
-                    type="button"
-                    title="Adicionar carga"
-                    aria-label="Adicionar carga"
-                    onClick={onAddCharge}
-                >
-                    <Plus size={16} strokeWidth={2} />
-                    <span>Adicionar</span>
-                </button>
+            </div>
+
+            <div style={separatorStyle} />
+
+            <div style={toolbarGroupStyle} aria-label="Camadas visuais">
+                <VisibilityToggle
+                    icon={Activity}
+                    label="Campo elétrico"
+                    shortcut="E"
+                    visible={globalVisibility.electricField}
+                    onClick={() => onToggleGlobalLayer('electricField')}
+                />
+                <VisibilityToggle
+                    icon={ArrowUpRight}
+                    label="Vetores de força"
+                    shortcut="F"
+                    visible={globalVisibility.forceVectors}
+                    onClick={() => onToggleGlobalLayer('forceVectors')}
+                />
+                <VisibilityToggle
+                    icon={Ruler}
+                    label="Distância e linha de ação"
+                    shortcut="R"
+                    visible={globalVisibility.distanceGuide}
+                    onClick={() => onToggleGlobalLayer('distanceGuide')}
+                />
             </div>
 
             <div style={separatorStyle} />
@@ -179,22 +234,6 @@ export function SimulationToolbar({
                 <AxisField axis="x" value={draft.x} onChange={onDraftChange} />
                 <AxisField axis="y" value={draft.y} onChange={onDraftChange} />
                 <AxisField axis="z" value={draft.z} onChange={onDraftChange} />
-                <button
-                    style={{
-                        ...toolButtonBaseStyle,
-                        width: 31,
-                        padding: 0,
-                        color: hasSelectedCharge ? '#c7e8d3' : '#657487',
-                        cursor: hasSelectedCharge ? 'pointer' : 'not-allowed',
-                    }}
-                    type="button"
-                    title="Aplicar posição"
-                    aria-label="Aplicar posição"
-                    disabled={!hasSelectedCharge}
-                    onClick={onApplyPosition}
-                >
-                    <Check size={16} strokeWidth={2} />
-                </button>
             </div>
 
             <div style={{ flex: 1, minWidth: 12 }} />

@@ -42,6 +42,7 @@ export class Canva3D {
     private readonly chargeSelectedListeners = new Set<(charge: Charge | null) => void>();
     private readonly raycaster = new THREE.Raycaster();
     private readonly pointer = new THREE.Vector2();
+    private moveToolActive = true;
     private selectedCharge: Charge | null = null;
 
     public constructor(container: HTMLElement, initialTheme: SimulationThemeConfig) {
@@ -135,8 +136,18 @@ export class Canva3D {
     public selectCharge(charge: Charge | null): void {
         this.selectedCharge = charge;
 
-        if (charge) {
+        if (charge && this.moveToolActive) {
             this.transformControls.attach(charge);
+        } else {
+            this.transformControls.detach();
+        }
+    }
+
+    public setMoveToolActive(active: boolean): void {
+        this.moveToolActive = active;
+
+        if (active && this.selectedCharge) {
+            this.transformControls.attach(this.selectedCharge);
         } else {
             this.transformControls.detach();
         }

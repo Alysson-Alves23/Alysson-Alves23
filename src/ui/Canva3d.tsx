@@ -15,10 +15,13 @@ import {
     SimulationToolbar,
     type SimulationTool,
 } from './SimulationToolbar';
+import { defaultChargeVisibility } from './simulationTypes';
 import type {
     ChargeDraft,
     ChargeDraftField,
     ChargeSummary,
+    ChargeVisibility,
+    VisualizationLayer,
 } from './simulationTypes';
 
 export interface Canva3dProps {
@@ -32,7 +35,7 @@ const initialDraft: ChargeDraft = {
     x: '0',
     y: '0',
     z: '0',
-    color: '#ff3b30',
+    color: String(defaultSimulationTheme.charge.positiveColor),
 };
 
 function readDraftPosition(draft: ChargeDraft): {
@@ -58,6 +61,13 @@ function positionOf(charge: Charge): [number, number, number] {
     return [charge.position.x, charge.position.y, charge.position.z];
 }
 
+function isEditableTarget(target: EventTarget | null): boolean {
+    return target instanceof HTMLInputElement
+        || target instanceof HTMLTextAreaElement
+        || target instanceof HTMLSelectElement
+        || (target instanceof HTMLElement && target.isContentEditable);
+}
+
 export default function Canva3d({
     className,
     style,
@@ -73,6 +83,9 @@ export default function Canva3d({
     const [selectedChargeId, setSelectedChargeId] = useState<string | null>(null);
     const [draft, setDraft] = useState<ChargeDraft>(initialDraft);
     const [activeTool, setActiveTool] = useState<SimulationTool>('select');
+    const [globalVisibility, setGlobalVisibility] = useState<ChargeVisibility>({
+        ...defaultChargeVisibility,
+    });
 
     useEffect(() => {
         const container = containerRef.current;
@@ -83,6 +96,7 @@ export default function Canva3d({
 
         const canva3D = new Canva3D(container, initialThemeRef.current);
         canvaRef.current = canva3D;
+        canva3D.setMoveToolActive(false);
         const unsubscribeFromSelection = canva3D.onChargeSelected((charge) => {
             if (!charge) {
                 selectedChargeIdRef.current = null;
@@ -136,6 +150,57 @@ export default function Canva3d({
             ...currentDraft,
             [field]: value,
         }));
+
+        const chargeId = selectedChargeIdRef.current;
+        const charge = chargeId ? chargesRef.current.get(chargeId) : undefined;
+
+        if (!charge) {
+            return;
+        }
+
+        if (field === 'color') {
+            charge.setColor(value);
+            setCharges((currentCharges) => currentCharges.map((currentCharge) => (
+                currentCharge.id === charge.chargeId
+                    ? { ...currentCharge, color: charge.getColor() }
+                    : currentCharge
+            )));
+        }
+
+        if (field === 'value') {
+            const parsedValue = Number(value);
+
+            if (value.trim() !== '' && Number.isFinite(parsedValue)) {
+                charge.setValue(parsedValue);
+                setCharges((currentCharges) => currentCharges.map((currentCharge) => (
+                    currentCharge.id === charge.chargeId
+                        ? { ...currentCharge, value: charge.getValue() }
+                        : currentCharge
+                )));
+            }
+        }
+
+        if (field === 'x' || field === 'y' || field === 'z') {
+            const coordinate = Number(value);
+
+            if (value.trim() === '' || !Number.isFinite(coordinate)) {
+                return;
+            }
+
+            if (field === 'x') {
+                charge.position.x = coordinate;
+            } else if (field === 'y') {
+                charge.position.y = coordinate;
+            } else {
+                charge.position.z = coordinate;
+            }
+
+            setCharges((currentCharges) => currentCharges.map((currentCharge) => (
+                currentCharge.id === charge.chargeId
+                    ? { ...currentCharge, position: positionOf(charge) }
+                    : currentCharge
+            )));
+        }
     };
 
     const handleAddCharge = (): void => {
@@ -156,9 +221,11 @@ export default function Canva3d({
         });
         charge.position.set(parsedDraft.x, parsedDraft.y, parsedDraft.z);
         chargesRef.current.set(id, charge);
+        canva3D.setMoveToolActive(true);
         canva3D.selectCharge(charge);
         selectedChargeIdRef.current = id;
         setSelectedChargeId(id);
+        setActiveTool('move');
         setCharges((currentCharges) => [
             ...currentCharges,
             {
@@ -166,6 +233,7 @@ export default function Canva3d({
                 value: parsedDraft.value,
                 color: parsedDraft.color,
                 position: positionOf(charge),
+                visibility: { ...globalVisibility },
             },
         ]);
     };
@@ -191,45 +259,6 @@ export default function Canva3d({
         }));
     };
 
-    const handleApplyPosition = (): void => {
-        const chargeId = selectedChargeIdRef.current;
-        const charge = chargeId ? chargesRef.current.get(chargeId) : undefined;
-        const parsedDraft = readDraftPosition(draft);
-
-        if (!charge || !parsedDraft) {
-            return;
-        }
-
-        charge.position.set(parsedDraft.x, parsedDraft.y, parsedDraft.z);
-        setCharges((currentCharges) => currentCharges.map((currentCharge) => (
-            currentCharge.id === charge.chargeId
-                ? { ...currentCharge, position: positionOf(charge) }
-                : currentCharge
-        )));
-    };
-
-    const handleApplyProperties = (): void => {
-        const chargeId = selectedChargeIdRef.current;
-        const charge = chargeId ? chargesRef.current.get(chargeId) : undefined;
-        const parsedDraft = readDraftPosition(draft);
-
-        if (!charge || !parsedDraft) {
-            return;
-        }
-
-        charge.setValue(parsedDraft.value);
-        charge.setColor(parsedDraft.color);
-        setCharges((currentCharges) => currentCharges.map((currentCharge) => (
-            currentCharge.id === charge.chargeId
-                ? {
-                    ...currentCharge,
-                    value: charge.getValue(),
-                    color: charge.getColor(),
-                }
-                : currentCharge
-        )));
-    };
-
     const handleRemoveCharge = (): void => {
         const chargeId = selectedChargeIdRef.current;
         const charge = chargeId ? chargesRef.current.get(chargeId) : undefined;
@@ -247,9 +276,108 @@ export default function Canva3d({
         ));
     };
 
+    const handleClearSelection = (): void => {
+        const canva3D = canvaRef.current;
+
+        if (canva3D) {
+            canva3D.selectCharge(null);
+        }
+
+        selectedChargeIdRef.current = null;
+        setSelectedChargeId(null);
+        setActiveTool('select');
+    };
+
     const handleToolChange = (tool: SimulationTool): void => {
         setActiveTool(tool);
+        canvaRef.current?.setMoveToolActive(tool === 'move');
     };
+
+    const handleToggleGlobalLayer = (layer: VisualizationLayer): void => {
+        setGlobalVisibility((currentVisibility) => ({
+            ...currentVisibility,
+            [layer]: !currentVisibility[layer],
+        }));
+    };
+
+    const handleToggleChargeLayer = (layer: VisualizationLayer): void => {
+        const chargeId = selectedChargeIdRef.current;
+
+        if (!chargeId) {
+            return;
+        }
+
+        setCharges((currentCharges) => currentCharges.map((charge) => (
+            charge.id === chargeId
+                ? {
+                    ...charge,
+                    visibility: {
+                        ...charge.visibility,
+                        [layer]: !charge.visibility[layer],
+                    },
+                }
+                : charge
+        )));
+    };
+
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent): void => {
+            if (isEditableTarget(event.target)) {
+                return;
+            }
+
+            const key = event.key.toLowerCase();
+
+            if (event.key === 'Delete' || event.key === 'Backspace') {
+                if (selectedChargeIdRef.current) {
+                    event.preventDefault();
+                    handleRemoveCharge();
+                }
+                return;
+            }
+
+            if (event.key === 'Escape') {
+                handleClearSelection();
+                return;
+            }
+
+            if (key === 'v') {
+                handleToolChange('select');
+                return;
+            }
+
+            if (key === 'g') {
+                handleToolChange('move');
+                return;
+            }
+
+            if (key === 'e') {
+                handleToggleGlobalLayer('electricField');
+                return;
+            }
+
+            if (key === 'f') {
+                handleToggleGlobalLayer('forceVectors');
+                return;
+            }
+
+            if (key === 'r') {
+                handleToggleGlobalLayer('distanceGuide');
+                return;
+            }
+
+            if (event.shiftKey && key === 'a') {
+                event.preventDefault();
+                handleAddCharge();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [draft, globalVisibility, selectedChargeId]);
 
     return (
         <div
@@ -280,10 +408,9 @@ export default function Canva3d({
                 activeTool={activeTool}
                 chargesCount={charges.length}
                 draft={draft}
-                hasSelectedCharge={Boolean(selectedChargeId)}
-                onAddCharge={handleAddCharge}
-                onApplyPosition={handleApplyPosition}
+                globalVisibility={globalVisibility}
                 onDraftChange={handleDraftChange}
+                onToggleGlobalLayer={handleToggleGlobalLayer}
                 onToolChange={handleToolChange}
             />
             <SimulationControls
@@ -293,8 +420,8 @@ export default function Canva3d({
                 onDraftChange={handleDraftChange}
                 onAddCharge={handleAddCharge}
                 onSelectCharge={handleSelectCharge}
-                onApplyProperties={handleApplyProperties}
                 onRemoveCharge={handleRemoveCharge}
+                onToggleChargeLayer={handleToggleChargeLayer}
             />
         </div>
     );
