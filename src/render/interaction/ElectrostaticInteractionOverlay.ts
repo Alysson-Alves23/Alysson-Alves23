@@ -9,10 +9,15 @@ import type { VisualizationVisibility } from '../types/VisualizationVisibility';
 import type { SimulationThemeConfig } from '../types/SimulationTheme';
 import { FieldArrowInstances } from '../field/FieldArrowInstances';
 import { formatMeasurement } from '../annotations/MeasurementLabelLayer';
+import { limitForceVectorDisplayLength } from './ForceVectorDisplay';
 
 const GUIDE_COLOR = 0xc4ceda;
 const VISUAL_OFFSET = 0.06;
 const EMPTY_INTERACTIONS: ElectrostaticInteractionResults = { forceContributions: [], pairDistances: [] };
+
+function chargePairKey(firstChargeId: string, secondChargeId: string): string {
+    return JSON.stringify([firstChargeId, secondChargeId].sort());
+}
 
 function disposeVisualResources(root: THREE.Object3D): void {
     root.traverse((object) => {
@@ -135,21 +140,34 @@ export class ElectrostaticInteractionOverlay extends THREE.Group {
         // Like the probe, all arrows share a linear scale. Include hidden vectors in
         // the reference so toggling visibility never resizes the remaining arrows.
         const maximum = finiteVectors.reduce((value, vector) => Math.max(value, vector.magnitude), 0);
+        const pairDistances = new Map(this.interactions.pairDistances.map(pairDistance => [
+            chargePairKey(pairDistance.firstChargeId, pairDistance.secondChargeId),
+            pairDistance.distanceMeters,
+        ]));
         const color = new THREE.Color(this.appearance.color);
         this.forceVectorsGroup.setArrows(finiteVectors
             .filter(vector => this.isLayerVisible(vector.chargeId, 'forceVectors'))
-            .map(vector => ({
-                origin: vector.origin,
-                direction: vector.direction,
-                length: (vector.magnitude / maximum) * this.appearance.maximumLength,
-                color,
-                measurement: {
-                    id: `force:${vector.chargeId}:${vector.causedByChargeId}`,
-                    text: `|F| = ${formatMeasurement(vector.magnitude, 'N')}`,
-                    kind: 'force' as const,
-                    ownerChargeIds: [vector.chargeId],
-                },
-            })));
+            .map((vector) => {
+                const scaledLength = (vector.magnitude / maximum) * this.appearance.maximumLength;
+                const pairDistance = pairDistances.get(
+                    chargePairKey(vector.chargeId, vector.causedByChargeId),
+                );
+
+                return {
+                    origin: vector.origin,
+                    direction: vector.direction,
+                    length: pairDistance === undefined
+                        ? scaledLength
+                        : limitForceVectorDisplayLength(scaledLength, pairDistance),
+                    color,
+                    measurement: {
+                        id: `force:${vector.chargeId}:${vector.causedByChargeId}`,
+                        text: `|F| = ${formatMeasurement(vector.magnitude, 'N')}`,
+                        kind: 'force' as const,
+                        ownerChargeIds: [vector.chargeId],
+                    },
+                };
+            }));
     }
 
     private renderDistanceGuides(pairDistances: ElectrostaticInteractionResults['pairDistances']): void {
